@@ -7,11 +7,11 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Bütçe Pro</title>
+<title>Bütçe Pro v3.0</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js" onerror="window._firebaseFailed=true"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js" onerror="window._firebaseFailed=true"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js" onerror="window._chartjsFailed=true"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 :root {
   --bg:#f8fafc;--surface:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;
@@ -223,7 +223,7 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tex
 <div class="shell desktop-only">
   <div class="desktop-sidebar">
     <div class="sb-logo" onclick="showDashboard()">
-      <span>💎 BÜTÇE PRO</span>
+      <span>💎 BÜTÇE PRO <small style="opacity:.4;font-size:10px">v3.0</small></span>
       <span id="sync-icon-d" style="color:#374151;font-size:10px">●</span>
     </div>
     <div class="sb-scroll" id="sb-nav"></div>
@@ -304,11 +304,6 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tex
 <div class="toast" id="toast"></div>
 
 <script>
-window.onerror=function(msg,src,line,col,err){
-  document.body.style.background='#fff';
-  document.body.innerHTML='<div style="padding:20px;font-family:monospace;font-size:12px;color:red;word-break:break-all"><b>JS HATASI:</b><br><br>'+msg+'<br><br>Satır: '+line+', Sütun: '+col+'<br><br>'+(err?err.stack||String(err):'')+'</div>';
-  return false;
-};
 /* ══ PLATFORM ══ */
 const isMobile=()=>window.innerWidth<768;
 
@@ -321,15 +316,9 @@ const firebaseConfig={
   messagingSenderId:"438608180746",
   appId:"1:438608180746:web:95c95ebb8c7749024611f3"
 };
-let db_cloud=null;
-const _urlUser=new URLSearchParams(window.location.search).get('u');
-const budgetId=_urlUser?'PRO-BUTCE-'+_urlUser.toUpperCase():'PRO-BUTCE-MASTER-V2';
-try{
-  if(typeof firebase!=='undefined'){
-    firebase.initializeApp(firebaseConfig);
-    db_cloud=firebase.firestore();
-  }
-}catch(e){db_cloud=null;}
+firebase.initializeApp(firebaseConfig);
+const db_cloud=firebase.firestore();
+const budgetId="PRO-BUTCE-MASTER-V2";
 
 /* ══ SABİTLER ══ */
 const AY_ADLARI=['OCAK','ŞUBAT','MART','NİSAN','MAYIS','HAZİRAN','TEMMUZ','AĞUSTOS','EYLÜL','EKİM','KASIM','ARALIK'];
@@ -433,38 +422,19 @@ function initYear(y,doSave=true){
   }
 }
 
-
-/* ALIŞVERİŞ migration: tutarı olan satırları otomatik ödendi yap */
-function migrateAlisveris(){
-  Object.values(db_data.years||{}).forEach(yr=>{
-    Object.values(yr.months||{}).forEach(mn=>{
-      const rows=mn.bolumler?.['ALIŞVERİŞ']?.rows;
-      if(!rows)return;
-      rows.forEach(r=>{if(r.tutar&&r.tutar!==0&&!r.isPaid)r.isPaid=true;});
-    });
-  });
-}
 /* ══ FIREBASE ══ */
 function loadSync(){
-  if(!db_cloud){
-    setSyncStatus(false);
-    const local=localStorage.getItem('butce_offline');
-    if(local){try{db_data=JSON.parse(local);}catch(e){}}
-    if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
-    migrateAlisveris();refresh();
-    return;
-  }
   db_cloud.collection('budgets').doc(budgetId).onSnapshot(doc=>{
     if(doc.exists){
-      try{db_data=JSON.parse(doc.data().data);setSyncStatus(true);migrateAlisveris();refresh();}
+      try{db_data=JSON.parse(doc.data().data);setSyncStatus(true);refresh();}
       catch(e){toast('Veri parse hatası.');}
-    }else{initYear(currentView.y);migrateAlisveris();refresh();}
+    }else{initYear(currentView.y);refresh();}
   },err=>{
     setSyncStatus(false);toast('Offline çalışılıyor.');
     const local=localStorage.getItem('butce_offline');
     if(local){try{db_data=JSON.parse(local);}catch(e){}}
     if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
-    migrateAlisveris();refresh();
+    refresh();
   });
 }
 function setSyncStatus(ok){
@@ -474,7 +444,7 @@ function setSyncStatus(ok){
 function save(){
   const json=JSON.stringify(db_data);localStorage.setItem('butce_offline',json);
   clearTimeout(saveTimer);
-  if(db_cloud)saveTimer=setTimeout(()=>{db_cloud.collection('budgets').doc(budgetId).set({data:json}).catch(()=>toast('Kayıt hatası.'));},600);
+  saveTimer=setTimeout(()=>{db_cloud.collection('budgets').doc(budgetId).set({data:json}).catch(()=>toast('Kayıt hatası.'));},600);
 }
 function refresh(){if(currentView.screen==='month')showMonth(currentView.y,currentView.ay);else showDashboard(currentView.dashYear);}
 
@@ -660,7 +630,6 @@ function renderMonthDesktop(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKal
     <div class="section-body open">`;
 
     if(isY){html+=`<div class="tbl-row yatirim-row header"><div></div><div>Açıklama</div><div>Miktar</div><div>Birim Fiyat</div><div style="text-align:right">Tutar</div><div style="text-align:center">Ödendi</div><div></div></div>`;}
-    else if(b.id==='ALIŞVERİŞ'){html+=`<div class="tbl-row header"><div></div><div>Sürd.</div><div>Açıklama</div><div style="text-align:right">Tutar</div><div style="text-align:center">Durum</div><div style="text-align:center">Ödendi</div><div style="text-align:center">Taksit</div><div></div></div>`;}
     else{html+=`<div class="tbl-row header"><div></div><div>Sürd.</div><div>Açıklama</div><div style="text-align:right">Tutar</div><div style="text-align:center">Son Ödeme</div><div style="text-align:center">Ödendi</div><div style="text-align:center">Taksit</div><div></div></div>`;}
 
     rows.forEach((r,i)=>{
@@ -690,16 +659,16 @@ function renderMonthDesktop(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKal
         const td=r.tutar?(r.tutar<0?'-':'')+fmt(r.tutar):'';
         const taksitCell=isLast
           ?`<div><div class="taksit-badge last">🎉 Son!</div></div>`
-          :`<div><div class="taksit-badge">${tIdx>0?'<span style="color:#64748b">'+tIdx+'/</span>':''}<input type="number" style="width:28px;text-align:center;font-weight:800;font-family:'IBM Plex Mono'" value="${r.taksit||''}" placeholder="—" onchange="rUp('${b.id}',${i},'taksit',this.value)"></div></div>`;
+          :`<div><div class="taksit-badge">${tIdx>0?`<span style="color:#64748b">${tIdx}/</span>`:''}<input type="number" style="width:28px;text-align:center;font-weight:800;font-family:'IBM Plex Mono'" value="${r.taksit||''}" placeholder="—" onchange="rUp('${b.id}',${i},'taksit',this.value)"></div></div>`;
         html+=`<div class="tbl-row ${rowCls}">
           <div>${getBankLogo(r.ad)}</div>
           <div class="copy-btn ${r.copy?'active':''}" onclick="toggleCopy('${b.id}',${i})" title="Sürekli">🔄</div>
           <div><input value="${r.ad||''}" placeholder="${ph}" onchange="rUp('${b.id}',${i},'ad',this.value)" onkeydown="if(event.key==='Enter')focusNextInput(this)"></div>
           <div><input class="tutar-input" style="color:${tc}" value="${td}"
             onfocus="this.value=getRaw(${y},'${ay}','${b.id}',${i});this.select()"
-            onblur="rUp('${b.id}',${i},'tutar',this.value);var rv=db_data.years[${y}].months['${ay}'].bolumler['${b.id}'].rows[${i}];this.value=rv.tutar?(rv.tutar<0?'-':'')+fmt(rv.tutar):''"
+            onblur="var rv=db_data.years[${y}].months['${ay}'].bolumler['${b.id}'].rows[${i}];this.value=rv.tutar?(rv.tutar<0?'-':'')+fmt(rv.tutar):''"
             onchange="rUp('${b.id}',${i},'tutar',this.value)" onkeydown="if(event.key==='Enter')focusNextInput(this)"></div>
-          ${(function(){if(b.id==='ALIŞVERİŞ'){return '<div style="text-align:center;font-size:11px;font-weight:700;color:'+(r.isPaid?'#15803d':'#64748b')+'">'+(r.isPaid?'✓ Ödendi':'—')+'</div>';}else{return '<div style="text-align:center"><input class="tarih-input" style="background:'+stl.bg+';color:'+stl.text+';text-decoration:'+(stl.deco||'none')+'" value="'+(r.tarih||'')+'" placeholder="GG.AA" onfocus="this.select()" onblur="rUp(\''+b.id+'\','+i+',\'tarih\',this.value)" onkeydown="if(event.key===\'Enter\'){rUp(\''+b.id+'\','+i+',\'tarih\',this.value);focusNextInput(this);}"></div>';}})()}
+          <div style="text-align:center"><input class="tarih-input" style="background:${stl.bg};color:${stl.text};text-decoration:${stl.deco||'none'}" value="${r.tarih||''}" placeholder="GG.AA" onfocus="this.select()" onblur="rUp('${b.id}',${i},'tarih',this.value)" onkeydown="if(event.key==='Enter'){rUp('${b.id}',${i},'tarih',this.value);focusNextInput(this);}"></div>
           <div style="text-align:center"><input type="checkbox" class="paid-check" ${r.isPaid?'checked':''} onchange="rUp('${b.id}',${i},'isPaid',this.checked)"></div>
           ${taksitCell}
           <div class="del-btn" onclick="rDel('${b.id}',${i})">✕</div>
@@ -764,15 +733,14 @@ function renderMonthMobile(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKala
       const ph=b.id==='KREDİ KARTI'?'Banka Adı':'Açıklama';
 
       let metaHtml='';
-      if(r.tarih&&b.id!=="ALIŞVERİŞ")metaHtml+=`<span class="m-tarih" style="background:${stl.bg};color:${stl.text}">${r.tarih}</span>`;
-      if(b.id==="ALIŞVERİŞ"){var _bg=r.isPaid?"#f0fdf4":"#f1f5f9";var _cl=r.isPaid?"#15803d":"#94a3b8";var _tx=r.isPaid?"✓ Ödendi":"bekliyor";metaHtml+=`<span class="m-tarih" style="background:${_bg};color:${_cl}">${_tx}</span>`;}
+      if(r.tarih)metaHtml+=`<span class="m-tarih" style="background:${stl.bg};color:${stl.text}">${r.tarih}</span>`;
       if(r.taksit>0){if(isLast)metaHtml+=`<span class="m-taksit-badge last">🎉 Son!</span>`;else metaHtml+=`<span class="m-taksit-badge">${tIdx>0?tIdx+'/':''}${r.taksit}</span>`;}
       if(r.copy&&!isY)metaHtml+=`<span class="m-copy-dot on">🔄</span>`;
 
       html+=`<div class="m-row ${rowCls}" onclick="toggleMobEdit('${r.id}')">
         ${getBankLogo(r.ad,true)}
         <div class="m-body">
-          <div class="m-ad ${r.isPaid?'paid-txt':''}">${r.ad||'<span style="color:#cbd5e1">'+ph+' girin</span>'}</div>
+          <div class="m-ad ${r.isPaid?'paid-txt':''}">${r.ad||`<span style="color:#cbd5e1">${ph} girin</span>`}</div>
           <div class="m-meta">${metaHtml}</div>
         </div>
         <div class="m-right">
@@ -795,8 +763,8 @@ function renderMonthMobile(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKala
         html+=`<div class="m-edit ${editOpen?'open':''}" id="ep-${r.id}">
           <div class="m-edit-grid">
             <div class="m-edit-field full"><label>${ph}</label><input value="${r.ad||''}" placeholder="${ph}" onchange="rUp('${b.id}',${i},'ad',this.value)"></div>
-            <div class="m-edit-field"><label>Tutar</label><input type="text" inputmode="text" value="${r.tutar?Math.abs(r.tutar):''}" placeholder="0" onfocus="this.value=getRaw(${y},'${ay}','${b.id}',${i});this.select()" onblur="rUp('${b.id}',${i},'tutar',this.value);var rv=db_data.years[${y}].months['${ay}'].bolumler['${b.id}'].rows[${i}];this.value=rv.tutar?Math.abs(rv.tutar):''" onchange="rUp('${b.id}',${i},'tutar',this.value)"></div>
-            ${(function(){if(b.id==='ALIŞVERİŞ'){return '<div class="m-edit-field"><label>Son Ödeme</label><input value="Ödendi ✓" readonly style="color:#15803d;font-weight:700;background:#f0fdf4"></div>';}else{return '<div class="m-edit-field"><label>Son Ödeme</label><input value="'+(r.tarih||'')+'" placeholder="GG.AA" inputmode="numeric" onblur="rUp(\''+b.id+'\','+i+',\'tarih\',this.value)"></div>';}})()}
+            <div class="m-edit-field"><label>Tutar</label><input type="number" inputmode="decimal" value="${r.tutar?Math.abs(r.tutar):''}" placeholder="0" onfocus="this.value=getRaw(${y},'${ay}','${b.id}',${i})" onblur="var rv=db_data.years[${y}].months['${ay}'].bolumler['${b.id}'].rows[${i}];this.value=rv.tutar?Math.abs(rv.tutar):''" onchange="rUp('${b.id}',${i},'tutar',this.value)"></div>
+            <div class="m-edit-field"><label>Son Ödeme</label><input value="${r.tarih||''}" placeholder="GG.AA" inputmode="numeric" onblur="rUp('${b.id}',${i},'tarih',this.value)"></div>
             <div class="m-edit-field"><label>Taksit</label><input type="number" inputmode="numeric" value="${r.taksit||''}" placeholder="—" onchange="rUp('${b.id}',${i},'taksit',this.value)"></div>
             <div class="m-edit-field"><label>Taksit No</label><input readonly value="${tIdx>0?tIdx+' / '+r.taksit:''}" placeholder="—" style="color:var(--muted)"></div>
           </div>
@@ -837,7 +805,6 @@ function rUp(bId,i,k,v){
     row.tutar_raw=v;const n=evalSafe(v);
     row.tutar=(bId==='YATIRIM')?Math.abs(n):-Math.abs(n);
     if(bId==='YATIRIM'&&row.miktar&&row.birim){row.tutar=evalSafe(row.miktar)*evalSafe(row.birim);row.tutar_raw=String(row.tutar);}
-    if(bId==='ALIŞVERİŞ'&&n&&n!==0)row.isPaid=true;
   }else if(k==='miktar'||k==='birim'){
     row[k]=v;
     if(row.miktar&&row.birim){const calc=evalSafe(row.miktar)*evalSafe(row.birim);row.tutar=calc;row.tutar_raw=String(calc);}
@@ -898,24 +865,19 @@ function propagate(startY,startAy,bId,row){
     if(shouldExist){
       const newR={...row,isPaid:false};
       if(bId==='KREDİ KARTI'){
-        // KK: tutar sıfırla, tarihi ilerlet (adjNext)
         newR.tutar=0;newR.tutar_raw='';
         const d=row.baseDay||(row.tarih?.includes('.')?parseInt(row.tarih.split('.')[0]):null)||1;
         newR.baseDay=d;
         newR.tarih=fmtDate(adjNext(new Date(targetY,mIdx,Math.min(d,new Date(targetY,mIdx+1,0).getDate()))));
-      }else{
-        // Taksit veya sürekli: girilen günü koru, tatil/hafta sonuna denk gelirse önceki iş gününe çek
+      }else if(steps>0){
+        /* FİX: taksit tarihi — girilen günü koru, ay sonu değil */
         const bd=row.baseDay||(row.tarih?.includes('.')?parseInt(row.tarih.split('.')[0]):null)||null;
         if(bd){
           const lastOfMonth=new Date(targetY,mIdx+1,0).getDate();
-          const targetDate=new Date(targetY,mIdx,Math.min(bd,lastOfMonth));
-          // Tatil/hafta sonu ise önceki iş günü
-          newR.tarih=fmtDate(adjPrev(targetDate));
-          newR.baseDay=bd; // baseDay'i koru, bir sonraki ay için
-        }else if(steps>0){
-          // baseDay yoksa: tarihi olduğu gibi bırak
+          newR.tarih=fmtDate(adjPrev(new Date(targetY,mIdx,Math.min(bd,lastOfMonth))));
+        }else{
+          newR.tarih=fmtDate(getLastBiz(targetY,mIdx));
         }
-        // copy için baseDay yoksa tarihi olduğu gibi bırak
       }
       if(idx>-1)targetRows[idx]=newR;else targetRows.push(newR);
 
@@ -1024,39 +986,7 @@ function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t
 let _resizeTimer;
 window.addEventListener('resize',()=>{clearTimeout(_resizeTimer);_resizeTimer=setTimeout(()=>refresh(),300);});
 
-try{
-  if(window._firebaseFailed||typeof firebase==='undefined'){
-    // Firebase yüklenemedi - offline modda başlat
-    setSyncStatus(false);
-    const local=localStorage.getItem('butce_offline');
-    if(local){try{db_data=JSON.parse(local);}catch(e){}}
-    if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
-    refresh();
-  } else {
-    // Eğer 4 saniye içinde yüklenmediyse zorla başlat
-setTimeout(function(){
-  const sub=document.getElementById('mob-subtitle');
-  if(sub&&sub.textContent==='Yükleniyor…'){
-    try{
-      const local=localStorage.getItem('butce_offline');
-      if(local)db_data=JSON.parse(local);
-    }catch(e){}
-    if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
-    setSyncStatus(false);
-    migrateAlisveris();refresh();
-  }
-},4000);
 loadSync();
-  }
-}catch(e){
-  // Herhangi bir hata - offline modda başlat
-  try{
-    const local=localStorage.getItem('butce_offline');
-    if(local)db_data=JSON.parse(local);
-  }catch(e2){}
-  if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
-  refresh();
-}
 </script>
 </body>
 </html>
