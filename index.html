@@ -7,11 +7,11 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Bütçe Pro v3.0</title>
+<title>Bütçe Pro</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js" onerror="window._firebaseFailed=true"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js" onerror="window._firebaseFailed=true"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js" onerror="window._chartjsFailed=true"></script>
 <style>
 :root {
   --bg:#f8fafc;--surface:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;
@@ -20,8 +20,6 @@
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;}
-
-/* ── ORTAK ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:500;display:flex;align-items:center;justify-content:center;padding:16px;}
 .modal-box{background:#fff;border-radius:16px;width:100%;max-width:460px;overflow:hidden;box-shadow:0 25px 50px rgba(0,0,0,.15);}
 .modal-hdr{padding:16px 20px;background:#f8fafc;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
@@ -51,8 +49,6 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tex
 .progress-wrap{height:6px;background:#e2e8f0;border-radius:10px;overflow:hidden;}
 .progress-bar{height:100%;border-radius:10px;transition:width .5s ease,background .3s;}
 #import-file{display:none;}
-
-/* ══ MASAÜSTÜ (≥768px) ══ */
 @media(min-width:768px){
   .mobile-only{display:none!important;}
   .mob-app,.mob-drawer,.mob-nav{display:none!important;}
@@ -113,8 +109,6 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tex
   .add-row-btn:hover{background:#f1f5f9;color:var(--teal);}
   .dash-panel{background:#fff;padding:24px;border-radius:14px;border:1px solid var(--border);margin-bottom:24px;}
 }
-
-/* ══ MOBİL (<768px) ══ */
 @media(max-width:767px){
   .desktop-only{display:none!important;}
   html,body{height:100%;overflow:hidden;}
@@ -218,12 +212,10 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tex
   <option value="ALTIN (Gr)"></option>
   <option value="ALTIN (Çeyrek)"></option>
 </datalist>
-
-<!-- ══ MASAÜSTÜ ══ -->
 <div class="shell desktop-only">
   <div class="desktop-sidebar">
     <div class="sb-logo" onclick="showDashboard()">
-      <span>💎 BÜTÇE PRO <small style="opacity:.4;font-size:10px">v3.0</small></span>
+      <span>💎 BÜTÇE PRO</span>
       <span id="sync-icon-d" style="color:#374151;font-size:10px">●</span>
     </div>
     <div class="sb-scroll" id="sb-nav"></div>
@@ -238,8 +230,6 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tex
     <div style="display:flex;align-items:center;justify-content:center;height:60vh;color:var(--muted)">Yükleniyor…</div>
   </div>
 </div>
-
-<!-- ══ MOBİL ══ -->
 <div class="mob-app mobile-only">
   <div class="mob-header">
     <div>
@@ -258,8 +248,6 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tex
     <div class="mob-nav-item" id="mni-dash" onclick="showDashboard()"><span class="ni-icon">📊</span>Grafik</div>
   </div>
 </div>
-
-<!-- Drawers (mobil) -->
 <div class="mob-drawer mobile-only" id="month-drawer">
   <div class="drawer-bg" onclick="closeMonthDrawer()"></div>
   <div class="drawer-box">
@@ -282,8 +270,6 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tex
     <div class="mob-sync-info" id="mob-sync-txt">Senkronizasyon…</div>
   </div>
 </div>
-
-<!-- Not Modalı (ortak) -->
 <div class="modal-overlay" id="note-modal" style="display:none" onclick="if(event.target===this)closeNoteModal()">
   <div class="modal-box">
     <div class="modal-hdr"><div class="modal-title">📝 Ay Notları</div><span class="modal-close" onclick="closeNoteModal()">×</span></div>
@@ -299,28 +285,35 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tex
     </div>
   </div>
 </div>
-
 <input type="file" id="import-file" accept=".json" onchange="importData(event)">
 <div class="toast" id="toast"></div>
-
 <script>
-/* ══ PLATFORM ══ */
+window.onerror=function(msg,src,line,col,err){
+  document.body.style.background='#fff';
+  document.body.innerHTML='<div style="padding:20px;font-family:monospace;font-size:12px;color:red;word-break:break-all"><b>JS HATASI:</b><br><br>'+msg+'<br><br>Satır: '+line+', Sütun: '+col+'<br><br>'+(err?err.stack||String(err):'')+'</div>';
+  return false;
+};
 const isMobile=()=>window.innerWidth<768;
 
-/* ══ CONFIG ══ */
+/* ══ YENİ FİREBASE CONFIG (butce-pro) ══ */
 const firebaseConfig={
-  apiKey:"AIzaSyAsS...", // ← TAM KEY GİRİN
-  authDomain:"butce-plan-emre.firebaseapp.com",
-  projectId:"butce-plan-emre",
-  storageBucket:"butce-plan-emre.firebasestorage.app",
-  messagingSenderId:"438608180746",
-  appId:"1:438608180746:web:95c95ebb8c7749024611f3"
+  apiKey:"AIzaSyDYulwjvda8o6Y7qhBU0xzOLZzSys31A3g",
+  authDomain:"butce-pro.firebaseapp.com",
+  projectId:"butce-pro",
+  storageBucket:"butce-pro.firebasestorage.app",
+  messagingSenderId:"405947134350",
+  appId:"1:405947134350:web:47cb7ff5fd84c04f88b4df"
 };
-firebase.initializeApp(firebaseConfig);
-const db_cloud=firebase.firestore();
-const budgetId="PRO-BUTCE-MASTER-V2";
+let db_cloud=null;
+const _urlUser=new URLSearchParams(window.location.search).get('u');
+const budgetId=_urlUser?'PRO-BUTCE-'+_urlUser.toUpperCase():'PRO-BUTCE-MASTER-V2';
+try{
+  if(typeof firebase!=='undefined'){
+    firebase.initializeApp(firebaseConfig);
+    db_cloud=firebase.firestore();
+  }
+}catch(e){db_cloud=null;}
 
-/* ══ SABİTLER ══ */
 const AY_ADLARI=['OCAK','ŞUBAT','MART','NİSAN','MAYIS','HAZİRAN','TEMMUZ','AĞUSTOS','EYLÜL','EKİM','KASIM','ARALIK'];
 const BOLUMLER=[
   {id:'KREDİ KARTI',   icon:'💳',cls:'hdr-kredi',  defaults:[]},
@@ -331,18 +324,14 @@ const BOLUMLER=[
 const BANKA_RENK={'ALBARAKA':'#c41230','KUVEYT':'#006a4d','VAKIFBANK':'#b8860b','FİNANS':'#0033a0','İŞ':'#004a99','GARANTİ':'#10b981','YAPI':'#0033a0'};
 const TATILLER=["01.01","20.03","21.03","22.03","23.04","01.05","19.05","27.05","28.05","29.05","30.05","15.07","30.08","29.10"];
 
-/* ══ DURUM ══ */
 let db_data={years:{}};
 let currentView={screen:'month',dashYear:'ALL',y:new Date().getFullYear(),ay:AY_ADLARI[new Date().getMonth()]};
 let saveTimer=null,openEditId=null;
 
-/* ══ YARDIMCILAR ══ */
 function isHoliday(d){const dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0');return TATILLER.includes(`${dd}.${mm}`);}
 function adjNext(dO){let d=new Date(dO);while(d.getDay()===0||d.getDay()===6||isHoliday(d))d.setDate(d.getDate()+1);return d;}
 function adjPrev(dO){let d=new Date(dO);while(d.getDay()===0||d.getDay()===6||isHoliday(d))d.setDate(d.getDate()-1);return d;}
-function getLastBiz(y,mIdx){return adjPrev(new Date(y,mIdx+1,0));}
 function fmtDate(d){return String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+d.getFullYear();}
-
 function normalizeTarih(v,y,bId){
   if(!v)return v;
   if(v.includes('.')&&v.split('.').length===3){
@@ -356,36 +345,28 @@ function normalizeTarih(v,y,bId){
   if(c.length===4){const dO=new Date(y,parseInt(c.substring(2,4))-1,parseInt(c.substring(0,2)));if(!isNaN(dO.getTime()))return fmtDate(bId==='KREDİ KARTI'?adjNext(dO):adjPrev(dO));}
   return v;
 }
-
-/* FİX: TR formatında çok sayıda virgüllü ifadeyi doğru hesapla */
 function evalSafe(v){
   if(!v&&v!==0)return 0;
   try{
     let s=v.toString().trim().replace(/\s/g,'');
     const parts=s.split(/([+\-*\/])/);
-    const conv=parts.map(p=>{
-      if(/^[+\-*\/]$/.test(p))return p;
-      return p.replace(/\./g,'').replace(',','.');
-    });
+    const conv=parts.map(p=>{if(/^[+\-*\/]$/.test(p))return p;return p.replace(/\./g,'').replace(',','.');});
     let c=conv.join('').replace(/[^0-9+\-*\/().]/g,'');
     if(!c)return 0;
     const r=Function('"use strict";return ('+c+')')()||0;
     return isFinite(r)?parseFloat(Number(r).toFixed(2)):0;
   }catch(e){return 0;}
 }
-
 function fmt(n){const val=Number(n||0);if(Object.is(val,-0)||val===0)return'0';return Math.abs(val).toLocaleString('tr-TR',{minimumFractionDigits:0,maximumFractionDigits:0});}
 function fmtTL(n){const val=Number(n||0);if(Object.is(val,-0)||val===0)return'₺0';const f=Math.abs(val).toLocaleString('tr-TR',{minimumFractionDigits:0,maximumFractionDigits:0});return val<0?`-₺${f}`:`₺${f}`;}
 function getRaw(y,ay,bId,i){const row=db_data.years[y]?.months[ay]?.bolumler[bId]?.rows[i];return row?(row.tutar_raw||''):'';}
 function getMaasRaw(y,ay){return db_data.years[y]?.months[ay]?.maas_raw||'';}
-
 function getBankLogo(name,mobile=false){
   const upper=(name||'').trim().toUpperCase();let c='#4b5563';let init='?';
   if(upper){init=upper[0];for(const k in BANKA_RENK){if(upper.includes(k)){c=BANKA_RENK[k];break;}}}
   const sz=mobile?30:26;const cls=mobile?'m-logo':'bank-logo';
   return `<div class="${cls}" style="background:${c};width:${sz}px;height:${sz}px">${init}</div>`;
 }
-
 function getDateStyles(v,isPaid){
   if(!v||!v.includes('.'))return{bg:'transparent',text:'#cbd5e1'};
   if(isPaid)return{bg:'#f0fdf4',text:'#15803d',deco:'line-through'};
@@ -395,24 +376,14 @@ function getDateStyles(v,isPaid){
 }
 function ensureId(row){if(!row.id)row.id='r_'+Date.now()+'_'+Math.random().toString(36).slice(2);return row;}
 
-/* ══ VERİ MODELİ ══ */
 function defaultMonth(){
   const m={maas:0,maas_raw:'',notes:{kiraci:'',genel:''},bolumler:{}};
   BOLUMLER.forEach(b=>{
-    m.bolumler[b.id]={rows:b.defaults.map(ad=>ensureId({
-      ad,tutar:0,tutar_raw:'',miktar:'',birim:'',tarih:'',
-      copy:false,isPaid:false,taksit:0,startAbs:0,baseDay:null,
-      /* KK'da defaults boş, diğer bölümlerde _ph:false (kullanıcı satırı gibi) */
-      _ph:false
-    }))};
-    /* KK boş olarak gelir, hiç satır yok */
-    if(b.id==='KREDİ KARTI'){
-      m.bolumler[b.id]={rows:[ensureId({ad:'',tutar:0,tutar_raw:'',miktar:'',birim:'',tarih:'',copy:false,isPaid:false,taksit:0,startAbs:0,baseDay:null,_ph:true})]};
-    }
+    m.bolumler[b.id]={rows:b.defaults.map(ad=>ensureId({ad,tutar:0,tutar_raw:'',miktar:'',birim:'',tarih:'',copy:false,isPaid:false,taksit:0,startAbs:0,baseDay:null,_ph:false}))};
+    if(b.id==='KREDİ KARTI'){m.bolumler[b.id]={rows:[ensureId({ad:'',tutar:0,tutar_raw:'',miktar:'',birim:'',tarih:'',copy:false,isPaid:false,taksit:0,startAbs:0,baseDay:null,_ph:true})]};}
   });
   return m;
 }
-
 function initYear(y,doSave=true){
   y=Number(y);
   if(!db_data.years[y]){
@@ -421,20 +392,27 @@ function initYear(y,doSave=true){
     if(doSave)save();
   }
 }
+function migrateAlisveris(){
+  Object.values(db_data.years||{}).forEach(yr=>{Object.values(yr.months||{}).forEach(mn=>{const rows=mn.bolumler?.['ALIŞVERİŞ']?.rows;if(!rows)return;rows.forEach(r=>{if(r.tutar&&r.tutar!==0&&!r.isPaid)r.isPaid=true;});});});
+}
 
-/* ══ FIREBASE ══ */
 function loadSync(){
+  if(!db_cloud){
+    setSyncStatus(false);
+    const local=localStorage.getItem('butce_offline');
+    if(local){try{db_data=JSON.parse(local);}catch(e){}}
+    if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
+    migrateAlisveris();refresh();return;
+  }
   db_cloud.collection('budgets').doc(budgetId).onSnapshot(doc=>{
-    if(doc.exists){
-      try{db_data=JSON.parse(doc.data().data);setSyncStatus(true);refresh();}
-      catch(e){toast('Veri parse hatası.');}
-    }else{initYear(currentView.y);refresh();}
+    if(doc.exists){try{db_data=JSON.parse(doc.data().data);setSyncStatus(true);migrateAlisveris();refresh();}catch(e){toast('Veri parse hatası.');}}
+    else{initYear(currentView.y);migrateAlisveris();refresh();}
   },err=>{
     setSyncStatus(false);toast('Offline çalışılıyor.');
     const local=localStorage.getItem('butce_offline');
     if(local){try{db_data=JSON.parse(local);}catch(e){}}
     if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
-    refresh();
+    migrateAlisveris();refresh();
   });
 }
 function setSyncStatus(ok){
@@ -444,11 +422,10 @@ function setSyncStatus(ok){
 function save(){
   const json=JSON.stringify(db_data);localStorage.setItem('butce_offline',json);
   clearTimeout(saveTimer);
-  saveTimer=setTimeout(()=>{db_cloud.collection('budgets').doc(budgetId).set({data:json}).catch(()=>toast('Kayıt hatası.'));},600);
+  if(db_cloud)saveTimer=setTimeout(()=>{db_cloud.collection('budgets').doc(budgetId).set({data:json}).catch(()=>toast('Kayıt hatası.'));},600);
 }
 function refresh(){if(currentView.screen==='month')showMonth(currentView.y,currentView.ay);else showDashboard(currentView.dashYear);}
 
-/* ══ DEVREDEN BAKİYE ══ */
 function getDevredenBakiye(stopY,stopAy){
   let total=0;const stopYN=Number(stopY);const stopMIdx=AY_ADLARI.indexOf(stopAy);
   Object.keys(db_data.years).sort().forEach(yStr=>{
@@ -457,16 +434,13 @@ function getDevredenBakiye(stopY,stopAy){
       if(yN===stopYN&&mIdx>=stopMIdx)return;
       const m=db_data.years[yStr]?.months[ay];if(!m)return;
       let net=m.maas||0;
-      Object.entries(m.bolumler).forEach(([bId,b])=>{
-        b.rows.forEach(r=>{if(r.isPaid)net+=(bId==='YATIRIM')?-Math.abs(r.tutar||0):(r.tutar||0);});
-      });
+      Object.entries(m.bolumler).forEach(([bId,b])=>{b.rows.forEach(r=>{if(r.isPaid)net+=(bId==='YATIRIM')?-Math.abs(r.tutar||0):(r.tutar||0);});});
       total+=net;
     });
   });
   return total;
 }
 
-/* ══ NAV (masaüstü) ══ */
 function buildDesktopNav(){
   let html=`<div class="nav-section" style="margin-bottom:8px"><div class="nav-link ${currentView.screen==='dashboard'?'active':''}" onclick="showDashboard()">📊 <span style="margin-left:6px">Finansal Gelişim</span></div></div>`;
   Object.keys(db_data.years).sort((a,b)=>b-a).forEach(yStr=>{
@@ -474,12 +448,7 @@ function buildDesktopNav(){
     html+=`<div class="nav-section"><div class="nav-header"><span class="nav-label">📅 ${y}</span><div class="year-del-btn" onclick="deleteYear(${y})">SİL</div></div>`;
     AY_ADLARI.forEach(ay=>{
       const m=db_data.years[yStr]?.months[ay];let badge='';
-      if(m){
-        let maas=m.maas||0;let g=0;
-        Object.entries(m.bolumler).forEach(([bId,b])=>b.rows.forEach(r=>{if(r.isPaid)g+=(bId==='YATIRIM')?-Math.abs(r.tutar||0):r.tutar;}));
-        const net=maas+g;
-        if(net!==0)badge=`<span class="nav-badge ${net>0?'pos':'neg'}">${net>0?'+':''}${Math.round(net/1000)}K</span>`;
-      }
+      if(m){let maas=m.maas||0;let g=0;Object.entries(m.bolumler).forEach(([bId,b])=>b.rows.forEach(r=>{if(r.isPaid)g+=(bId==='YATIRIM')?-Math.abs(r.tutar||0):r.tutar;}));const net=maas+g;if(net!==0)badge=`<span class="nav-badge ${net>0?'pos':'neg'}">${net>0?'+':''}${Math.round(net/1000)}K</span>`;}
       const isAct=currentView.screen==='month'&&currentView.y===y&&currentView.ay===ay;
       html+=`<div class="nav-link ${isAct?'active':''}" onclick="showMonth(${y},'${ay}')">${ay} ${badge}</div>`;
     });
@@ -488,7 +457,6 @@ function buildDesktopNav(){
   const el=document.getElementById('sb-nav');if(el)el.innerHTML=html;
 }
 
-/* ══ CHART ══ */
 function getChartData(targetYear){
   const gel=[],gid=[],yat=[];let cumYat=0;
   const years=(targetYear==='ALL')?Object.keys(db_data.years).sort():[String(targetYear)];
@@ -497,9 +465,7 @@ function getChartData(targetYear){
     years.forEach(yStr=>{
       const m=db_data.years[yStr]?.months[ay];if(!m?.bolumler)return;
       ayGel+=(m.maas||0);
-      Object.entries(m.bolumler).forEach(([bId,b])=>{
-        b.rows.forEach(r=>{if(!r.isPaid)return;if(bId==='YATIRIM'){ayYat+=Math.abs(r.tutar||0);ayGid-=Math.abs(r.tutar||0);}else ayGid+=(r.tutar||0);});
-      });
+      Object.entries(m.bolumler).forEach(([bId,b])=>{b.rows.forEach(r=>{if(!r.isPaid)return;if(bId==='YATIRIM'){ayYat+=Math.abs(r.tutar||0);ayGid-=Math.abs(r.tutar||0);}else ayGid+=(r.tutar||0);});});
     });
     gel.push(ayGel);gid.push(ayGid);cumYat+=ayYat;yat.push(cumYat);
   });
@@ -518,7 +484,6 @@ function showDashboard(year='ALL'){
   const mwd=d.gel.filter(v=>v>0).length||1;
   const totGel=d.gel.reduce((a,b)=>a+b,0),totGid=d.gid.reduce((a,b)=>a+b,0);
   const yOpts=Object.keys(db_data.years).sort().map(y=>`<option value="${y}" ${year==y?'selected':''}>${y} Yılı</option>`).join('');
-
   if(isMobile()){
     setMobNav('mni-dash');
     document.getElementById('mob-subtitle').textContent='Finansal Gelişim';
@@ -571,7 +536,6 @@ function showDashboard(year='ALL'){
   },50);
 }
 
-/* ══ AY SAYFASI ══ */
 function showMonth(y,ay){
   y=Number(y);currentView={screen:'month',dashYear:currentView.dashYear,y,ay};
   if(!db_data.years[y])initYear(y);openEditId=null;
@@ -593,7 +557,6 @@ function showMonth(y,ay){
   }
 }
 
-/* ══ MASAÜSTÜ RENDER ══ */
 function renderMonthDesktop(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKalan){
   let html=`
     <div class="summary-grid">
@@ -616,22 +579,19 @@ function renderMonthDesktop(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKal
         onkeydown="if(event.key==='Enter'){this.blur();focusNextInput(this);}">
       <div class="progress-wrap" style="margin-top:10px"><div class="progress-bar" id="prog-bar" style="width:${perc}%;background:${barColor}"></div></div>
     </div>`;
-
   BOLUMLER.forEach(b=>{
     const isY=b.id==='YATIRIM';const rows=m.bolumler[b.id]?.rows||[];
     const bTotal=rows.reduce((s,r)=>s+(isY?-Math.abs(r.tutar||0):(r.tutar||0)),0);
     const bOdenen=rows.filter(r=>r.isPaid).reduce((s,r)=>s+(isY?-Math.abs(r.tutar||0):(r.tutar||0)),0);
-
     html+=`<div class="section-block"><div class="section-hdr ${b.cls}" onclick="toggleSection(this)">
       <span>${b.icon} ${b.id}</span>
       ${bTotal?`<span class="s-total">${fmtTL(bTotal)}</span>`:''}
       ${bOdenen&&bOdenen!==bTotal?`<span style="font-size:11px;opacity:.7">(ödenen:${fmtTL(bOdenen)})</span>`:''}
       <span class="chev open">▶</span></div>
     <div class="section-body open">`;
-
     if(isY){html+=`<div class="tbl-row yatirim-row header"><div></div><div>Açıklama</div><div>Miktar</div><div>Birim Fiyat</div><div style="text-align:right">Tutar</div><div style="text-align:center">Ödendi</div><div></div></div>`;}
+    else if(b.id==='ALIŞVERİŞ'){html+=`<div class="tbl-row header"><div></div><div>Sürd.</div><div>Açıklama</div><div style="text-align:right">Tutar</div><div style="text-align:center">Durum</div><div style="text-align:center">Ödendi</div><div style="text-align:center">Taksit</div><div></div></div>`;}
     else{html+=`<div class="tbl-row header"><div></div><div>Sürd.</div><div>Açıklama</div><div style="text-align:right">Tutar</div><div style="text-align:center">Son Ödeme</div><div style="text-align:center">Ödendi</div><div style="text-align:center">Taksit</div><div></div></div>`;}
-
     rows.forEach((r,i)=>{
       ensureId(r);
       const stl=getDateStyles(r.tarih,r.isPaid);
@@ -639,7 +599,6 @@ function renderMonthDesktop(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKal
       const tIdx=r.taksit>0?(nowAbs-(r.startAbs||nowAbs)+1):0;
       const isLast=r.taksit===1;
       const rowCls=r.isPaid?'paid-row':(r.tarih&&getDateStyles(r.tarih,false).text==='#b91c1c'?'overdue-row':'');
-
       if(isY){
         html+=`<div class="tbl-row yatirim-row ${rowCls}">
           <div>${getBankLogo(r.ad)}</div>
@@ -657,18 +616,16 @@ function renderMonthDesktop(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKal
         const ph=b.id==='KREDİ KARTI'?'Banka Adı':'Açıklama';
         const tc=r.isPaid?'#15803d':'#dc2626';
         const td=r.tutar?(r.tutar<0?'-':'')+fmt(r.tutar):'';
-        const taksitCell=isLast
-          ?`<div><div class="taksit-badge last">🎉 Son!</div></div>`
-          :`<div><div class="taksit-badge">${tIdx>0?`<span style="color:#64748b">${tIdx}/</span>`:''}<input type="number" style="width:28px;text-align:center;font-weight:800;font-family:'IBM Plex Mono'" value="${r.taksit||''}" placeholder="—" onchange="rUp('${b.id}',${i},'taksit',this.value)"></div></div>`;
+        const taksitCell=isLast?`<div><div class="taksit-badge last">🎉 Son!</div></div>`:`<div><div class="taksit-badge">${tIdx>0?'<span style="color:#64748b">'+tIdx+'/</span>':''}<input type="number" style="width:28px;text-align:center;font-weight:800;font-family:'IBM Plex Mono'" value="${r.taksit||''}" placeholder="—" onchange="rUp('${b.id}',${i},'taksit',this.value)"></div></div>`;
         html+=`<div class="tbl-row ${rowCls}">
           <div>${getBankLogo(r.ad)}</div>
           <div class="copy-btn ${r.copy?'active':''}" onclick="toggleCopy('${b.id}',${i})" title="Sürekli">🔄</div>
           <div><input value="${r.ad||''}" placeholder="${ph}" onchange="rUp('${b.id}',${i},'ad',this.value)" onkeydown="if(event.key==='Enter')focusNextInput(this)"></div>
           <div><input class="tutar-input" style="color:${tc}" value="${td}"
             onfocus="this.value=getRaw(${y},'${ay}','${b.id}',${i});this.select()"
-            onblur="var rv=db_data.years[${y}].months['${ay}'].bolumler['${b.id}'].rows[${i}];this.value=rv.tutar?(rv.tutar<0?'-':'')+fmt(rv.tutar):''"
+            onblur="rUp('${b.id}',${i},'tutar',this.value);var rv=db_data.years[${y}].months['${ay}'].bolumler['${b.id}'].rows[${i}];this.value=rv.tutar?(rv.tutar<0?'-':'')+fmt(rv.tutar):''"
             onchange="rUp('${b.id}',${i},'tutar',this.value)" onkeydown="if(event.key==='Enter')focusNextInput(this)"></div>
-          <div style="text-align:center"><input class="tarih-input" style="background:${stl.bg};color:${stl.text};text-decoration:${stl.deco||'none'}" value="${r.tarih||''}" placeholder="GG.AA" onfocus="this.select()" onblur="rUp('${b.id}',${i},'tarih',this.value)" onkeydown="if(event.key==='Enter'){rUp('${b.id}',${i},'tarih',this.value);focusNextInput(this);}"></div>
+          ${(function(){if(b.id==='ALIŞVERİŞ'){return '<div style="text-align:center;font-size:11px;font-weight:700;color:'+(r.isPaid?'#15803d':'#64748b')+'">'+(r.isPaid?'✓ Ödendi':'—')+'</div>';}else{return '<div style="text-align:center"><input class="tarih-input" style="background:'+stl.bg+';color:'+stl.text+';text-decoration:'+(stl.deco||'none')+'" value="'+(r.tarih||'')+'" placeholder="GG.AA" onfocus="this.select()" onblur="rUp(\''+b.id+'\','+i+',\'tarih\',this.value)" onkeydown="if(event.key===\'Enter\'){rUp(\''+b.id+'\','+i+',\'tarih\',this.value);focusNextInput(this);}"></div>';}})()}
           <div style="text-align:center"><input type="checkbox" class="paid-check" ${r.isPaid?'checked':''} onchange="rUp('${b.id}',${i},'isPaid',this.checked)"></div>
           ${taksitCell}
           <div class="del-btn" onclick="rDel('${b.id}',${i})">✕</div>
@@ -680,7 +637,6 @@ function renderMonthDesktop(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKal
   return html;
 }
 
-/* ══ MOBİL RENDER ══ */
 function renderMonthMobile(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKalan){
   let html=`
     <div class="m-sum-row">
@@ -709,17 +665,14 @@ function renderMonthMobile(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKala
         <div class="progress-wrap"><div class="progress-bar" id="prog-bar" style="width:${perc}%;background:${barColor}"></div></div>
       </div>
     </div>`;
-
   BOLUMLER.forEach(b=>{
     const isY=b.id==='YATIRIM';const rows=m.bolumler[b.id]?.rows||[];
     const bTotal=rows.reduce((s,r)=>s+(isY?-Math.abs(r.tutar||0):(r.tutar||0)),0);
-
     html+=`<div class="section-block"><div class="section-hdr ${b.cls}" onclick="toggleSection(this)">
       <span>${b.icon} ${b.id}</span>
       ${bTotal?`<span class="s-total">${fmtTL(bTotal)}</span>`:''}
       <span class="chev open">▶</span></div>
     <div class="section-body open">`;
-
     rows.forEach((r,i)=>{
       ensureId(r);
       const stl=getDateStyles(r.tarih,r.isPaid);
@@ -731,16 +684,15 @@ function renderMonthMobile(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKala
       const tc=isY?'#15803d':(r.isPaid?'#15803d':'#dc2626');
       const td=isY?(r.tutar?fmt(r.tutar):''):(r.tutar?(r.tutar<0?'-':'')+fmt(r.tutar):'');
       const ph=b.id==='KREDİ KARTI'?'Banka Adı':'Açıklama';
-
       let metaHtml='';
-      if(r.tarih)metaHtml+=`<span class="m-tarih" style="background:${stl.bg};color:${stl.text}">${r.tarih}</span>`;
+      if(r.tarih&&b.id!=="ALIŞVERİŞ")metaHtml+=`<span class="m-tarih" style="background:${stl.bg};color:${stl.text}">${r.tarih}</span>`;
+      if(b.id==="ALIŞVERİŞ"){var _bg=r.isPaid?"#f0fdf4":"#f1f5f9";var _cl=r.isPaid?"#15803d":"#94a3b8";var _tx=r.isPaid?"✓ Ödendi":"bekliyor";metaHtml+=`<span class="m-tarih" style="background:${_bg};color:${_cl}">${_tx}</span>`;}
       if(r.taksit>0){if(isLast)metaHtml+=`<span class="m-taksit-badge last">🎉 Son!</span>`;else metaHtml+=`<span class="m-taksit-badge">${tIdx>0?tIdx+'/':''}${r.taksit}</span>`;}
       if(r.copy&&!isY)metaHtml+=`<span class="m-copy-dot on">🔄</span>`;
-
       html+=`<div class="m-row ${rowCls}" onclick="toggleMobEdit('${r.id}')">
         ${getBankLogo(r.ad,true)}
         <div class="m-body">
-          <div class="m-ad ${r.isPaid?'paid-txt':''}">${r.ad||`<span style="color:#cbd5e1">${ph} girin</span>`}</div>
+          <div class="m-ad ${r.isPaid?'paid-txt':''}">${r.ad||'<span style="color:#cbd5e1">'+ph+' girin</span>'}</div>
           <div class="m-meta">${metaHtml}</div>
         </div>
         <div class="m-right">
@@ -748,7 +700,6 @@ function renderMonthMobile(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKala
           <input type="checkbox" class="m-check" ${r.isPaid?'checked':''} onclick="event.stopPropagation()" onchange="rUp('${b.id}',${i},'isPaid',this.checked)">
         </div>
       </div>`;
-
       if(isY){
         html+=`<div class="m-edit ${editOpen?'open':''}" id="ep-${r.id}">
           <div class="m-edit-grid" style="grid-template-columns:1fr 1fr 1fr">
@@ -763,8 +714,8 @@ function renderMonthMobile(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKala
         html+=`<div class="m-edit ${editOpen?'open':''}" id="ep-${r.id}">
           <div class="m-edit-grid">
             <div class="m-edit-field full"><label>${ph}</label><input value="${r.ad||''}" placeholder="${ph}" onchange="rUp('${b.id}',${i},'ad',this.value)"></div>
-            <div class="m-edit-field"><label>Tutar</label><input type="number" inputmode="decimal" value="${r.tutar?Math.abs(r.tutar):''}" placeholder="0" onfocus="this.value=getRaw(${y},'${ay}','${b.id}',${i})" onblur="var rv=db_data.years[${y}].months['${ay}'].bolumler['${b.id}'].rows[${i}];this.value=rv.tutar?Math.abs(rv.tutar):''" onchange="rUp('${b.id}',${i},'tutar',this.value)"></div>
-            <div class="m-edit-field"><label>Son Ödeme</label><input value="${r.tarih||''}" placeholder="GG.AA" inputmode="numeric" onblur="rUp('${b.id}',${i},'tarih',this.value)"></div>
+            <div class="m-edit-field"><label>Tutar</label><input type="text" inputmode="text" value="${r.tutar?Math.abs(r.tutar):''}" placeholder="0" onfocus="this.value=getRaw(${y},'${ay}','${b.id}',${i});this.select()" onblur="rUp('${b.id}',${i},'tutar',this.value);var rv=db_data.years[${y}].months['${ay}'].bolumler['${b.id}'].rows[${i}];this.value=rv.tutar?Math.abs(rv.tutar):''" onchange="rUp('${b.id}',${i},'tutar',this.value)"></div>
+            ${(function(){if(b.id==='ALIŞVERİŞ'){return '<div class="m-edit-field"><label>Son Ödeme</label><input value="Ödendi ✓" readonly style="color:#15803d;font-weight:700;background:#f0fdf4"></div>';}else{return '<div class="m-edit-field"><label>Son Ödeme</label><input value="'+(r.tarih||'')+'" placeholder="GG.AA" inputmode="numeric" onblur="rUp(\''+b.id+'\','+i+',\'tarih\',this.value)"></div>';}})()}
             <div class="m-edit-field"><label>Taksit</label><input type="number" inputmode="numeric" value="${r.taksit||''}" placeholder="—" onchange="rUp('${b.id}',${i},'taksit',this.value)"></div>
             <div class="m-edit-field"><label>Taksit No</label><input readonly value="${tIdx>0?tIdx+' / '+r.taksit:''}" placeholder="—" style="color:var(--muted)"></div>
           </div>
@@ -780,9 +731,7 @@ function renderMonthMobile(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKala
   return html;
 }
 
-/* ══ ORTAK İŞLEMLER ══ */
 function toggleSection(hdr){const body=hdr.nextElementSibling;const chev=hdr.querySelector('.chev');body.classList.toggle('open');chev.classList.toggle('open');}
-
 function saveMaas(y,ay,raw){
   db_data.years[y].months[ay].maas_raw=raw;db_data.years[y].months[ay].maas=evalSafe(raw);
   save();if(!isMobile())buildDesktopNav();
@@ -791,20 +740,16 @@ function saveMaas(y,ay,raw){
   const perc=maas>0?Math.min((Math.abs(g)/maas)*100,100):0;const bc=perc>90?'#dc2626':perc>65?'#f59e0b':'#10b981';
   const pb=document.getElementById('prog-bar');if(pb){pb.style.width=perc+'%';pb.style.background=bc;}
 }
-
 function rUp(bId,i,k,v){
   const m=db_data.years[currentView.y].months[currentView.ay];
   const row=m.bolumler[bId].rows[i];ensureId(row);
-  if(k==='ad'){
-    row.ad=v;
-    if(v&&v.trim()!=='')row._ph=false; // ad yazılınca artık placeholder değil
-  }else if(k==='tarih'){
-    row.tarih=normalizeTarih(v,currentView.y,bId);
-    if(v){const c=v.replace(/\D/g,'');if(c.length>=2)row.baseDay=parseInt(c.substring(0,2));}
-  }else if(k==='tutar'){
+  if(k==='ad'){row.ad=v;if(v&&v.trim()!=='')row._ph=false;}
+  else if(k==='tarih'){row.tarih=normalizeTarih(v,currentView.y,bId);if(v){const c=v.replace(/\D/g,'');if(c.length>=2)row.baseDay=parseInt(c.substring(0,2));}}
+  else if(k==='tutar'){
     row.tutar_raw=v;const n=evalSafe(v);
     row.tutar=(bId==='YATIRIM')?Math.abs(n):-Math.abs(n);
     if(bId==='YATIRIM'&&row.miktar&&row.birim){row.tutar=evalSafe(row.miktar)*evalSafe(row.birim);row.tutar_raw=String(row.tutar);}
+    if(bId==='ALIŞVERİŞ'&&n&&n!==0)row.isPaid=true;
   }else if(k==='miktar'||k==='birim'){
     row[k]=v;
     if(row.miktar&&row.birim){const calc=evalSafe(row.miktar)*evalSafe(row.birim);row.tutar=calc;row.tutar_raw=String(calc);}
@@ -818,50 +763,20 @@ function rUp(bId,i,k,v){
   if(k==='copy')propagate(currentView.y,currentView.ay,bId,row);
   save();showMonth(currentView.y,currentView.ay);
 }
-
-/* ══ PROPAGATE ══ */
 function propagate(startY,startAy,bId,row){
   ensureId(row);
   const steps=parseInt(row.taksit)||0;
   const startAbs=Number(startY)*12+AY_ADLARI.indexOf(startAy);
   if(!row.startAbs)row.startAbs=startAbs;
-
-  /* Limit:
-     - Taksit: tam olarak steps-1 ay (yıl aşabilir)
-     - KK+copy veya diğer+copy: o yılın Aralık'ına kadar
-     - copy=false: 36 aylık silme taraması */
   let limit;
-  if(steps>0){
-    limit=steps-1;
-  }else if(row.copy){
-    limit=11-AY_ADLARI.indexOf(startAy); // yıl sonuna kadar
-  }else{
-    limit=36;
-  }
-
+  if(steps>0){limit=steps-1;}else if(row.copy){limit=11-AY_ADLARI.indexOf(startAy);}else{limit=36;}
   for(let i=1;i<=limit;i++){
-    const curAbs=startAbs+i;
-    const targetY=Math.floor(curAbs/12);
-    const mIdx=curAbs%12;
-    const mName=AY_ADLARI[mIdx];
+    const curAbs=startAbs+i;const targetY=Math.floor(curAbs/12);const mIdx=curAbs%12;const mName=AY_ADLARI[mIdx];
     const shouldExist=row.copy||(steps>0&&i<steps);
-
     if(!db_data.years[targetY]){if(shouldExist)initYear(targetY,false);else continue;}
-    const targetRows=db_data.years[targetY].months[mName].bolumler[bId]?.rows;
-    if(!targetRows)continue;
-
-    /* ID eşleşmesi: önce id'ye bak, sonra aynı ad + taksit olan satırı bul
-       (defaultMonth'tan gelen aynı isimli satırı kaplamaması için) */
+    const targetRows=db_data.years[targetY].months[mName].bolumler[bId]?.rows;if(!targetRows)continue;
     let idx=targetRows.findIndex(r=>r.id===row.id);
-    if(idx===-1&&steps>0){
-      /* defaultMonth'tan gelen, aynı ada sahip, henüz taksit girilmemiş satır varsa onu al */
-      const defIdx=targetRows.findIndex(r=>r.ad===row.ad&&(r.taksit===0||r.taksit===undefined)&&!r.isPaid&&r.id!==row.id);
-      if(defIdx>-1){
-        targetRows[defIdx].id=row.id; // ID'yi eşitle
-        idx=defIdx;
-      }
-    }
-
+    if(idx===-1&&steps>0){const defIdx=targetRows.findIndex(r=>r.ad===row.ad&&(r.taksit===0||r.taksit===undefined)&&!r.isPaid&&r.id!==row.id);if(defIdx>-1){targetRows[defIdx].id=row.id;idx=defIdx;}}
     if(shouldExist){
       const newR={...row,isPaid:false};
       if(bId==='KREDİ KARTI'){
@@ -869,92 +784,56 @@ function propagate(startY,startAy,bId,row){
         const d=row.baseDay||(row.tarih?.includes('.')?parseInt(row.tarih.split('.')[0]):null)||1;
         newR.baseDay=d;
         newR.tarih=fmtDate(adjNext(new Date(targetY,mIdx,Math.min(d,new Date(targetY,mIdx+1,0).getDate()))));
-      }else if(steps>0){
-        /* FİX: taksit tarihi — girilen günü koru, ay sonu değil */
+      }else{
         const bd=row.baseDay||(row.tarih?.includes('.')?parseInt(row.tarih.split('.')[0]):null)||null;
-        if(bd){
-          const lastOfMonth=new Date(targetY,mIdx+1,0).getDate();
-          newR.tarih=fmtDate(adjPrev(new Date(targetY,mIdx,Math.min(bd,lastOfMonth))));
-        }else{
-          newR.tarih=fmtDate(getLastBiz(targetY,mIdx));
-        }
+        if(bd){const lastOfMonth=new Date(targetY,mIdx+1,0).getDate();const targetDate=new Date(targetY,mIdx,Math.min(bd,lastOfMonth));newR.tarih=fmtDate(adjPrev(targetDate));newR.baseDay=bd;}
       }
       if(idx>-1)targetRows[idx]=newR;else targetRows.push(newR);
-
-      /* KK: gerçek banka eklendikten sonra _ph:true placeholder satırları temizle */
-      if(bId==='KREDİ KARTI'){
-        const hasReal=targetRows.some(r=>r.ad&&r.ad.trim()!=='');
-        if(hasReal){for(let j=targetRows.length-1;j>=0;j--){if(targetRows[j]._ph===true)targetRows.splice(j,1);}}
-      }
+      if(bId==='KREDİ KARTI'){const hasReal=targetRows.some(r=>r.ad&&r.ad.trim()!=='');if(hasReal){for(let j=targetRows.length-1;j>=0;j--){if(targetRows[j]._ph===true)targetRows.splice(j,1);}}}
     }else if(idx>-1){
       targetRows.splice(idx,1);
-      /* KK: gerçek satır kalmadıysa placeholder geri ekle */
-      if(bId==='KREDİ KARTI'){
-        const hasAny=targetRows.some(r=>r.ad&&r.ad.trim()!=='');
-        if(!hasAny)targetRows.push(ensureId({ad:'',tutar:0,tutar_raw:'',miktar:'',birim:'',tarih:'',copy:false,isPaid:false,taksit:0,startAbs:0,baseDay:null,_ph:true}));
-      }
+      if(bId==='KREDİ KARTI'){const hasAny=targetRows.some(r=>r.ad&&r.ad.trim()!=='');if(!hasAny)targetRows.push(ensureId({ad:'',tutar:0,tutar_raw:'',miktar:'',birim:'',tarih:'',copy:false,isPaid:false,taksit:0,startAbs:0,baseDay:null,_ph:true}));}
     }
   }
 }
-
-/* ══ toggleCopy ══ */
 function toggleCopy(bId,i){
   const row=db_data.years[currentView.y].months[currentView.ay].bolumler[bId].rows[i];
   row.copy=!row.copy;
   if(!row.copy){
-    /* copy kapatılınca: sonraki aylardaki kopyaları sil */
     const startAbs=Number(currentView.y)*12+AY_ADLARI.indexOf(currentView.ay);
     for(let j=1;j<=36;j++){
       const curAbs=startAbs+j;const tY=Math.floor(curAbs/12);const mIdx=curAbs%12;const mName=AY_ADLARI[mIdx];
       if(!db_data.years[tY])continue;
       const tRows=db_data.years[tY].months[mName].bolumler[bId]?.rows;if(!tRows)continue;
       const idx=tRows.findIndex(r=>r.id===row.id);if(idx>-1)tRows.splice(idx,1);
-      if(bId==='KREDİ KARTI'){
-        const hasAny=tRows.some(r=>r.ad&&r.ad.trim()!=='');
-        if(!hasAny)tRows.push(ensureId({ad:'',tutar:0,tutar_raw:'',miktar:'',birim:'',tarih:'',copy:false,isPaid:false,taksit:0,startAbs:0,baseDay:null,_ph:true}));
-      }
+      if(bId==='KREDİ KARTI'){const hasAny=tRows.some(r=>r.ad&&r.ad.trim()!=='');if(!hasAny)tRows.push(ensureId({ad:'',tutar:0,tutar_raw:'',miktar:'',birim:'',tarih:'',copy:false,isPaid:false,taksit:0,startAbs:0,baseDay:null,_ph:true}));}
     }
   }else{
-    /* copy açılınca: bu satırı gerçek yap, mevcut aydaki diğer _ph'ları temizle, yay */
     row._ph=false;
-    if(bId==='KREDİ KARTI'){
-      const curRows=db_data.years[currentView.y].months[currentView.ay].bolumler[bId].rows;
-      for(let j=curRows.length-1;j>=0;j--){
-        if(curRows[j]._ph===true&&curRows[j].id!==row.id)curRows.splice(j,1);
-      }
-    }
+    if(bId==='KREDİ KARTI'){const curRows=db_data.years[currentView.y].months[currentView.ay].bolumler[bId].rows;for(let j=curRows.length-1;j>=0;j--){if(curRows[j]._ph===true&&curRows[j].id!==row.id)curRows.splice(j,1);}}
     propagate(currentView.y,currentView.ay,bId,row);
   }
   save();showMonth(currentView.y,currentView.ay);
 }
-
 function rAdd(bId){
-  db_data.years[currentView.y].months[currentView.ay].bolumler[bId].rows.push(
-    ensureId({ad:'',tutar:0,tutar_raw:'',miktar:'',birim:'',tarih:'',copy:false,isPaid:false,taksit:0,startAbs:0,baseDay:null,_ph:false})
-  );
+  db_data.years[currentView.y].months[currentView.ay].bolumler[bId].rows.push(ensureId({ad:'',tutar:0,tutar_raw:'',miktar:'',birim:'',tarih:'',copy:false,isPaid:false,taksit:0,startAbs:0,baseDay:null,_ph:false}));
   save();showMonth(currentView.y,currentView.ay);
 }
 function rDel(bId,i){db_data.years[currentView.y].months[currentView.ay].bolumler[bId].rows.splice(i,1);save();showMonth(currentView.y,currentView.ay);}
-
 function focusNextInput(current){
   const inputs=Array.from(document.querySelectorAll('input:not([type="checkbox"]):not([type="number"])'));
   const idx=inputs.indexOf(current);const ni=idx+1;
   if(idx>-1&&ni<inputs.length){setTimeout(()=>{const r=Array.from(document.querySelectorAll('input:not([type="checkbox"]):not([type="number"])'));if(r[ni]){r[ni].focus();r[ni].select();}},50);}
 }
-
 function addYear(){const y=prompt('Eklenecek yıl?',new Date().getFullYear()+1);if(!y||isNaN(y))return;const yn=parseInt(y);if(db_data.years[yn]){toast(`${yn} zaten mevcut.`);return;}initYear(yn);showMonth(yn,'OCAK');toast(`${yn} yılı oluşturuldu.`);}
 function deleteYear(y){if(!confirm(`${y} yılı silinecek. Emin misiniz?`))return;delete db_data.years[y];save();toast(`${y} silindi.`);showDashboard();}
 function resetCurrentMonth(){if(!confirm(`${currentView.ay} ${currentView.y} sıfırlansın mı?`))return;db_data.years[currentView.y].months[currentView.ay]=defaultMonth();save();showMonth(currentView.y,currentView.ay);toast('Ay temizlendi.');}
-
 let _noteCtx=null;
 function openNoteModal(y,ay){_noteCtx={y,ay};const notes=db_data.years[y]?.months[ay]?.notes||{};document.getElementById('note-kiraci').value=notes.kiraci||'';document.getElementById('note-genel').value=notes.genel||'';document.getElementById('note-modal').style.display='flex';}
 function closeNoteModal(){document.getElementById('note-modal').style.display='none';_noteCtx=null;}
 function saveNoteModal(){if(!_noteCtx)return;const{y,ay}=_noteCtx;if(!db_data.years[y].months[ay].notes)db_data.years[y].months[ay].notes={};db_data.years[y].months[ay].notes.kiraci=document.getElementById('note-kiraci').value;db_data.years[y].months[ay].notes.genel=document.getElementById('note-genel').value;save();closeNoteModal();showMonth(y,ay);toast('Notlar kaydedildi.');}
-
 function exportData(){const json=JSON.stringify(db_data,null,2);const blob=new Blob([json],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`butce_yedek_${new Date().toISOString().split('T')[0]}.json`;a.click();toast('Yedek indirildi.');}
 function importData(event){const file=event.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{try{const imp=JSON.parse(e.target.result);if(!imp.years)throw new Error();if(!confirm('Mevcut veriler silinecek. Emin misiniz?'))return;db_data=imp;save();refresh();toast('Yedek yüklendi.');}catch(err){toast('Geçersiz yedek dosyası.');}};reader.readAsText(file);event.target.value='';}
-
-/* ══ MOBİL YARDIMCILAR ══ */
 function setMobNav(id){['mni-ay','mni-aylar','mni-dash'].forEach(n=>{document.getElementById(n)?.classList.remove('active');});document.getElementById(id)?.classList.add('active');}
 function showCurrentMonth(){showMonth(currentView.y,currentView.ay);}
 function toggleMobEdit(rowId){
@@ -979,14 +858,34 @@ function buildMonthDrawer(){
 }
 function openMobMenu(){document.getElementById('mob-menu-drawer').classList.add('open');}
 function closeMobMenu(){document.getElementById('mob-menu-drawer').classList.remove('open');}
-
 let _toastTimer;
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(_toastTimer);_toastTimer=setTimeout(()=>t.classList.remove('show'),3000);}
-
 let _resizeTimer;
 window.addEventListener('resize',()=>{clearTimeout(_resizeTimer);_resizeTimer=setTimeout(()=>refresh(),300);});
 
-loadSync();
+try{
+  if(window._firebaseFailed||typeof firebase==='undefined'){
+    setSyncStatus(false);
+    const local=localStorage.getItem('butce_offline');
+    if(local){try{db_data=JSON.parse(local);}catch(e){}}
+    if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
+    refresh();
+  }else{
+    setTimeout(function(){
+      const sub=document.getElementById('mob-subtitle');
+      if(sub&&sub.textContent==='Yükleniyor…'){
+        try{const local=localStorage.getItem('butce_offline');if(local)db_data=JSON.parse(local);}catch(e){}
+        if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
+        setSyncStatus(false);migrateAlisveris();refresh();
+      }
+    },4000);
+    loadSync();
+  }
+}catch(e){
+  try{const local=localStorage.getItem('butce_offline');if(local)db_data=JSON.parse(local);}catch(e2){}
+  if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
+  refresh();
+}
 </script>
 </body>
 </html>
