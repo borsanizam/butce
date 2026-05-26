@@ -406,12 +406,13 @@ function loadSync(){
   }
   db_cloud.collection('budgets').doc(budgetId).onSnapshot(doc=>{
     if(doc.exists){try{db_data=JSON.parse(doc.data().data);setSyncStatus(true);migrateAlisveris();refresh();}catch(e){toast('Veri parse hatası.');}}
-    else{initYear(currentView.y);migrateAlisveris();refresh();}
+    else{initYear(currentView.y,false);migrateAlisveris();refresh();} // yeni döküman: hemen kaydetme
   },err=>{
-    setSyncStatus(false);toast('Offline çalışılıyor.');
+    setSyncStatus(false);toast('Offline çalışılıyor — yerel veri yüklendi.');
     const local=localStorage.getItem('butce_offline');
     if(local){try{db_data=JSON.parse(local);}catch(e){}}
-    if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
+    // Offline'da boş kalsa bile Firebase'e yazma — veri silme riski
+    if(!Object.keys(db_data.years).length){db_data={years:{}};}
     migrateAlisveris();refresh();
   });
 }
@@ -420,6 +421,7 @@ function setSyncStatus(ok){
   const t=document.getElementById('mob-sync-txt');if(t)t.textContent=ok?'✓ Senkronize':'Offline — yerel veri';
 }
 function save(){
+  if(!db_data.years||Object.keys(db_data.years).length===0)return; // boş veri yazma
   const json=JSON.stringify(db_data);localStorage.setItem('butce_offline',json);
   clearTimeout(saveTimer);
   if(db_cloud)saveTimer=setTimeout(()=>{db_cloud.collection('budgets').doc(budgetId).set({data:json}).catch(()=>toast('Kayıt hatası.'));},600);
