@@ -306,7 +306,7 @@ const firebaseConfig={
 };
 let db_cloud=null;
 const _urlUser=new URLSearchParams(window.location.search).get('u');
-const budgetId=_urlUser?'PRO-BUTCE-'+_urlUser.toUpperCase():'PRO-BUTCE-MASTER-V2';
+const budgetId="BUTCE-PRO-NURI-V1";
 try{
   if(typeof firebase!=='undefined'){
     firebase.initializeApp(firebaseConfig);
