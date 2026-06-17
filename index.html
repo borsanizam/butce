@@ -397,41 +397,23 @@ function migrateAlisveris(){
 }
 
 function loadSync(){
-  // Önce localStorage'dan yükle, hemen göster
-  const local=localStorage.getItem('butce_offline');
-  if(local){
-    try{
-      const lp=JSON.parse(local);
-      if(lp&&lp.years&&Object.keys(lp.years).length>0){
-        db_data=lp;
-        migrateAlisveris();
-        refresh();
-      }
-    }catch(e){}
-  }
-  if(!db_cloud){setSyncStatus(false);if(!Object.keys(db_data.years).length)initYear(currentView.y,false);if(!Object.keys(db_data.years).length){migrateAlisveris();refresh();}return;}
-  // Sonra Firebase'den çek, varsa güncelle
-  db_cloud.collection('budgets').doc(budgetId).get().then(doc=>{
-    if(doc.exists){
-      try{
-        const parsed=JSON.parse(doc.data().data);
-        if(parsed&&parsed.years&&Object.keys(parsed.years).length>0){
-          db_data=parsed;
-          setSyncStatus(true);
-          migrateAlisveris();
-          refresh();
-          // localStorage'ı da güncelle
-          localStorage.setItem('butce_offline',JSON.stringify(db_data));
-        }else{
-          setSyncStatus(true);
-        }
-      }catch(e){setSyncStatus(false);}
-    }else{
-      setSyncStatus(false);
-      if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
-    }
-  }).catch(err=>{
+  if(!db_cloud){
     setSyncStatus(false);
+    const local=localStorage.getItem('butce_offline');
+    if(local){try{db_data=JSON.parse(local);}catch(e){}}
+    if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
+    migrateAlisveris();refresh();return;
+  }
+  db_cloud.collection('budgets').doc(budgetId).onSnapshot(doc=>{
+    if(doc.exists){try{db_data=JSON.parse(doc.data().data);setSyncStatus(true);migrateAlisveris();refresh();}catch(e){toast('Veri parse hatası.');}}
+    else{initYear(currentView.y,false);migrateAlisveris();refresh();} // yeni döküman: hemen kaydetme
+  },err=>{
+    setSyncStatus(false);toast('Offline çalışılıyor — yerel veri yüklendi.');
+    const local=localStorage.getItem('butce_offline');
+    if(local){try{db_data=JSON.parse(local);}catch(e){}}
+    // Offline'da boş kalsa bile Firebase'e yazma — veri silme riski
+    if(!Object.keys(db_data.years).length){db_data={years:{}};}
+    migrateAlisveris();refresh();
   });
 }
 function setSyncStatus(ok){
@@ -493,8 +475,8 @@ function getChartData(targetYear){
 }
 function getAssetInventory(targetYear){
   const inv={};const years=(targetYear==='ALL')?Object.keys(db_data.years):[String(targetYear)];
-  years.forEach(yStr=>{Object.values(db_data.years[yStr]?.months||{}).forEach(m=>{m.bolumler?.['YATIRIM']?.rows.forEach(r=>{if(r.isPaid&&r.ad&&r.miktar){const k=r.ad.toUpperCase().trim();inv[k]=(inv[k]||0)+Number(r.miktar||0);}});});});
-  return Object.entries(inv).filter(([,q])=>q>0).map(([n,q])=>`${q} ${n}`).join(' · ')||'Henüz varlık yok';
+  years.forEach(yStr=>{Object.values(db_data.years[yStr]?.months||{}).forEach(m=>{m.bolumler?.['YATIRIM']?.rows.forEach(r=>{if(r.isPaid&&r.ad&&r.miktar){const k=r.ad.toUpperCase().trim();const qty=evalSafe(r.miktar);inv[k]=(inv[k]||0)+qty;}});});});
+  return Object.entries(inv).filter(([,q])=>q>0).map(([n,q])=>`${fmt(q)} ${n}`).join(' · ')||'Henüz varlık yok';
 }
 
 let dashChart=null;
