@@ -306,7 +306,7 @@ const firebaseConfig={
 };
 let db_cloud=null;
 const _urlUser=new URLSearchParams(window.location.search).get('u');
-const budgetId="BUTCE-PRO-NURI-V1";
+const budgetId="PRO-BUTCE-MASTER-V2";
 try{
   if(typeof firebase!=='undefined'){
     firebase.initializeApp(firebaseConfig);
@@ -396,6 +396,7 @@ function migrateAlisveris(){
   Object.values(db_data.years||{}).forEach(yr=>{Object.values(yr.months||{}).forEach(mn=>{const rows=mn.bolumler?.['ALIŞVERİŞ']?.rows;if(!rows)return;rows.forEach(r=>{if(r.tutar&&r.tutar!==0&&!r.isPaid)r.isPaid=true;});});});
 }
 
+let _snapshotActive=false;
 function loadSync(){
   if(!db_cloud){
     setSyncStatus(false);
@@ -404,15 +405,46 @@ function loadSync(){
     if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
     migrateAlisveris();refresh();return;
   }
-  db_cloud.collection('budgets').doc(budgetId).onSnapshot(doc=>{
-    if(doc.exists){try{db_data=JSON.parse(doc.data().data);setSyncStatus(true);migrateAlisveris();refresh();}catch(e){toast('Veri parse hatası.');}}
-    else{initYear(currentView.y,false);migrateAlisveris();refresh();} // yeni döküman: hemen kaydetme
-  },err=>{
-    setSyncStatus(false);toast('Offline çalışılıyor — yerel veri yüklendi.');
+  // 1. Önce .get() ile güvenli ilk yükleme
+  db_cloud.collection('budgets').doc(budgetId).get().then(doc=>{
+    if(doc.exists){
+      try{
+        const parsed=JSON.parse(doc.data().data);
+        if(parsed&&parsed.years&&Object.keys(parsed.years).length>0){
+          db_data=parsed;
+        }else{
+          const local=localStorage.getItem('butce_offline');
+          if(local){try{const lp=JSON.parse(local);if(lp&&lp.years&&Object.keys(lp.years).length>0)db_data=lp;}catch(e){}}
+        }
+      }catch(e){
+        const local=localStorage.getItem('butce_offline');
+        if(local){try{db_data=JSON.parse(local);}catch(e2){}}
+      }
+    }else{
+      const local=localStorage.getItem('butce_offline');
+      if(local){try{const lp=JSON.parse(local);if(lp&&lp.years&&Object.keys(lp.years).length>0)db_data=lp;}catch(e){}}
+    }
+    if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
+    migrateAlisveris();setSyncStatus(true);refresh();
+    // 2. Canlı güncelleme için onSnapshot — sadece dışarıdan gelen değişiklikler
+    if(!_snapshotActive){
+      _snapshotActive=true;
+      db_cloud.collection('budgets').doc(budgetId).onSnapshot(doc=>{
+        if(doc.exists&&!doc.metadata.hasPendingWrites){
+          try{
+            const parsed=JSON.parse(doc.data().data);
+            if(parsed&&parsed.years&&Object.keys(parsed.years).length>0){
+              db_data=parsed;migrateAlisveris();setSyncStatus(true);refresh();
+            }
+          }catch(e){}
+        }
+      },err=>{setSyncStatus(false);});
+    }
+  }).catch(err=>{
+    setSyncStatus(false);
     const local=localStorage.getItem('butce_offline');
-    if(local){try{db_data=JSON.parse(local);}catch(e){}}
-    // Offline'da boş kalsa bile Firebase'e yazma — veri silme riski
-    if(!Object.keys(db_data.years).length){db_data={years:{}};}
+    if(local){try{const lp=JSON.parse(local);if(lp&&lp.years&&Object.keys(lp.years).length>0)db_data=lp;}catch(e){}}
+    if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
     migrateAlisveris();refresh();
   });
 }
@@ -421,10 +453,14 @@ function setSyncStatus(ok){
   const t=document.getElementById('mob-sync-txt');if(t)t.textContent=ok?'✓ Senkronize':'Offline — yerel veri';
 }
 function save(){
-  if(!db_data.years||Object.keys(db_data.years).length===0)return; // boş veri yazma
-  const json=JSON.stringify(db_data);localStorage.setItem('butce_offline',json);
+  if(!db_data.years||Object.keys(db_data.years).length===0){console.warn('save() engellendi: boş veri');return;}
+  const json=JSON.stringify(db_data);
+  try{localStorage.setItem('butce_offline',json);}catch(e){}
   clearTimeout(saveTimer);
-  if(db_cloud)saveTimer=setTimeout(()=>{db_cloud.collection('budgets').doc(budgetId).set({data:json}).catch(()=>toast('Kayıt hatası.'));},600);
+  if(db_cloud)saveTimer=setTimeout(()=>{
+    if(!db_data.years||Object.keys(db_data.years).length===0)return;
+    db_cloud.collection('budgets').doc(budgetId).set({data:json}).then(()=>setSyncStatus(true)).catch(()=>{setSyncStatus(false);toast('Kayıt hatası.');});
+  },600);
 }
 function refresh(){if(currentView.screen==='month')showMonth(currentView.y,currentView.ay);else showDashboard(currentView.dashYear);}
 
@@ -475,8 +511,8 @@ function getChartData(targetYear){
 }
 function getAssetInventory(targetYear){
   const inv={};const years=(targetYear==='ALL')?Object.keys(db_data.years):[String(targetYear)];
-  years.forEach(yStr=>{Object.values(db_data.years[yStr]?.months||{}).forEach(m=>{m.bolumler?.['YATIRIM']?.rows.forEach(r=>{if(r.isPaid&&r.ad&&r.miktar){const k=r.ad.toUpperCase().trim();const qty=evalSafe(r.miktar);inv[k]=(inv[k]||0)+qty;}});});});
-  return Object.entries(inv).filter(([,q])=>q>0).map(([n,q])=>`${fmt(q)} ${n}`).join(' · ')||'Henüz varlık yok';
+  years.forEach(yStr=>{Object.values(db_data.years[yStr]?.months||{}).forEach(m=>{m.bolumler?.['YATIRIM']?.rows.forEach(r=>{if(r.isPaid&&r.ad&&r.miktar){const k=r.ad.toUpperCase().trim();inv[k]=(inv[k]||0)+Number(r.miktar||0);}});});});
+  return Object.entries(inv).filter(([,q])=>q>0).map(([n,q])=>`${q} ${n}`).join(' · ')||'Henüz varlık yok';
 }
 
 let dashChart=null;
@@ -873,14 +909,6 @@ try{
     if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
     refresh();
   }else{
-    setTimeout(function(){
-      const sub=document.getElementById('mob-subtitle');
-      if(sub&&sub.textContent==='Yükleniyor…'){
-        try{const local=localStorage.getItem('butce_offline');if(local)db_data=JSON.parse(local);}catch(e){}
-        if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
-        setSyncStatus(false);migrateAlisveris();refresh();
-      }
-    },4000);
     loadSync();
   }
 }catch(e){
