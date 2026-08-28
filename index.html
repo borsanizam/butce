@@ -756,8 +756,7 @@ function satYatirim(bId,i){
   });
   toplamMiktar=parseFloat(toplamMiktar.toFixed(4));
   if(toplamMiktar<=0){toast('Envanterde bu varlık yok.');return;}
-  const satMiktarStr=prompt(adKey+' satış miktarı?
-(Toplam envanter: '+toplamMiktar+')', '');
+  const satMiktarStr=prompt(adKey+' satış miktarı? (Toplam envanter: '+toplamMiktar+')', '');
   if(!satMiktarStr||satMiktarStr.trim()==='')return;
   const satMiktar=evalSafe(satMiktarStr);
   if(!satMiktar||satMiktar<=0){toast('Geçersiz miktar.');return;}
