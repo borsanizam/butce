@@ -224,7 +224,6 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tex
       <button class="sb-btn warn" onclick="resetCurrentMonth()">🧹 Ayı Temizle</button>
       <button class="sb-btn info" onclick="exportData()">⬇ Yedek Al</button>
       <button class="sb-btn info" onclick="document.getElementById('import-file').click()">⬆ Yedek Yükle</button>
-      <button class="sb-btn info" onclick="openHistoryModal()">🕓 Geçmiş Sürümler</button>
     </div>
   </div>
   <div class="desktop-content" id="desktop-content">
@@ -265,7 +264,6 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tex
   <div class="mob-menu-box">
     <div class="menu-item-mob info" onclick="closeMobMenu();exportData()"><span class="mi">⬇</span>Yedek Al (JSON)</div>
     <div class="menu-item-mob info" onclick="closeMobMenu();document.getElementById('import-file').click()"><span class="mi">⬆</span>Yedek Yükle</div>
-    <div class="menu-item-mob info" onclick="closeMobMenu();openHistoryModal()"><span class="mi">🕓</span>Geçmiş Sürümler</div>
     <div class="menu-sep"></div>
     <div class="menu-item-mob warn" onclick="closeMobMenu();resetCurrentMonth()"><span class="mi">🧹</span>Ayı Temizle</div>
     <div class="menu-sep"></div>
@@ -284,28 +282,6 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tex
     <div class="modal-footer">
       <button class="modal-btn" onclick="closeNoteModal()">İptal</button>
       <button class="modal-btn primary" onclick="saveNoteModal()">Kaydet</button>
-    </div>
-  </div>
-</div>
-<div class="modal-overlay" id="conflict-modal" style="display:none">
-  <div class="modal-box">
-    <div class="modal-hdr"><div class="modal-title">⚠️ Çakışma Tespit Edildi</div></div>
-    <div class="modal-body">
-      <p style="font-size:13px;line-height:1.6">Başka bir cihazda bu veriler üzerinde daha yeni bir değişiklik yapılmış. Senin bu cihazdaki değişikliklerini kaydedersen o değişiklikler kaybolabilir.</p>
-      <p style="font-size:12px;color:var(--muted);margin-top:10px">Güvenli olan: sayfayı yenileyip en güncel veriyi almak, sonra değişikliğini tekrar yapmak.</p>
-    </div>
-    <div class="modal-footer">
-      <button class="modal-btn" onclick="location.reload()">Sayfayı Yenile (Önerilen)</button>
-      <button class="modal-btn primary" onclick="forceOverwriteRemote()">Yine de Benimkini Kaydet</button>
-    </div>
-  </div>
-</div>
-<div class="modal-overlay" id="history-modal" style="display:none" onclick="if(event.target===this)closeHistoryModal()">
-  <div class="modal-box" style="max-width:520px">
-    <div class="modal-hdr"><div class="modal-title">🕓 Geçmiş Sürümler</div><span class="modal-close" onclick="closeHistoryModal()">×</span></div>
-    <div class="modal-body" id="history-list" style="max-height:60vh;overflow-y:auto">Yükleniyor…</div>
-    <div class="modal-footer">
-      <button class="modal-btn" onclick="closeHistoryModal()">Kapat</button>
     </div>
   </div>
 </div>
@@ -330,8 +306,7 @@ const firebaseConfig={
 };
 let db_cloud=null;
 const _urlUser=new URLSearchParams(window.location.search).get('u');
-const budgetId="PRO-BUTCE-MASTER-V2";
-const deviceId=(function(){let id=localStorage.getItem('butce_device_id');if(!id){id='dev_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);localStorage.setItem('butce_device_id',id);}return id;})();
+const budgetId="BUTCE-PRO-NURI-V1";
 try{
   if(typeof firebase!=='undefined'){
     firebase.initializeApp(firebaseConfig);
@@ -352,8 +327,6 @@ const TATILLER=["01.01","20.03","21.03","22.03","23.04","01.05","19.05","27.05",
 let db_data={years:{}};
 let currentView={screen:'month',dashYear:'ALL',y:new Date().getFullYear(),ay:AY_ADLARI[new Date().getMonth()]};
 let saveTimer=null,openEditId=null;
-let lastKnownVersion=0;   // en son bilinen bulut versiyon numarası (yazma çakışma kontrolü için)
-let pendingWriteJson=null; // çakışma modalı için bekleyen yazma
 
 function isHoliday(d){const dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0');return TATILLER.includes(`${dd}.${mm}`);}
 function adjNext(dO){let d=new Date(dO);while(d.getDay()===0||d.getDay()===6||isHoliday(d))d.setDate(d.getDate()+1);return d;}
@@ -423,7 +396,6 @@ function migrateAlisveris(){
   Object.values(db_data.years||{}).forEach(yr=>{Object.values(yr.months||{}).forEach(mn=>{const rows=mn.bolumler?.['ALIŞVERİŞ']?.rows;if(!rows)return;rows.forEach(r=>{if(r.tutar&&r.tutar!==0&&!r.isPaid)r.isPaid=true;});});});
 }
 
-let _snapshotActive=false;
 function loadSync(){
   if(!db_cloud){
     setSyncStatus(false);
@@ -432,184 +404,28 @@ function loadSync(){
     if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
     migrateAlisveris();refresh();return;
   }
-  // 1. Önce .get() ile güvenli ilk yükleme
-  db_cloud.collection('budgets').doc(budgetId).get().then(doc=>{
-    if(doc.exists){
-      const raw=doc.data();
-      try{
-        const parsed=JSON.parse(raw.data);
-        if(parsed&&parsed.years&&Object.keys(parsed.years).length>0){
-          db_data=parsed;
-          lastKnownVersion=raw.version||0;
-        }else{
-          // Bulut verisi boş/bozuk görünüyor: ASLA otomatik olarak local ile üzerine yazma.
-          // Sadece görüntüle, kullanıcı onaylamadan save() tetiklenmeyecek.
-          const local=localStorage.getItem('butce_offline');
-          if(local){try{const lp=JSON.parse(local);if(lp&&lp.years&&Object.keys(lp.years).length>0){db_data=lp;toast('⚠️ Bulut verisi boş görünüyor, yerel veri gösteriliyor. Kaydetmeden önce kontrol et.');}}catch(e){}}
-        }
-      }catch(e){
-        const local=localStorage.getItem('butce_offline');
-        if(local){try{db_data=JSON.parse(local);toast('⚠️ Bulut verisi okunamadı, yerel veri gösteriliyor.');}catch(e2){}}
-      }
-    }else{
-      const local=localStorage.getItem('butce_offline');
-      if(local){try{const lp=JSON.parse(local);if(lp&&lp.years&&Object.keys(lp.years).length>0)db_data=lp;}catch(e){}}
-    }
-    if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
-    migrateAlisveris();setSyncStatus(true);refresh();
-    // 2. Canlı güncelleme için onSnapshot — sadece dışarıdan gelen değişiklikler
-    if(!_snapshotActive){
-      _snapshotActive=true;
-      db_cloud.collection('budgets').doc(budgetId).onSnapshot(doc=>{
-        if(doc.exists&&!doc.metadata.hasPendingWrites){
-          const raw=doc.data();
-          try{
-            const parsed=JSON.parse(raw.data);
-            if(parsed&&parsed.years&&Object.keys(parsed.years).length>0){
-              db_data=parsed;lastKnownVersion=raw.version||0;migrateAlisveris();setSyncStatus(true);refresh();
-            }
-          }catch(e){}
-        }
-      },err=>{setSyncStatus(false);});
-    }
-  }).catch(err=>{
-    setSyncStatus(false);
-    // Bulut erişilemedi: yerel veriyi SADECE gösterim için yükle, ama kaydetme kilidini aç
-    // (offlineMode=true) ki bağlantı geri gelmeden üzerine yazma riskini azaltalım.
-    window._offlineMode=true;
+  db_cloud.collection('budgets').doc(budgetId).onSnapshot(doc=>{
+    if(doc.exists){try{db_data=JSON.parse(doc.data().data);setSyncStatus(true);migrateAlisveris();refresh();}catch(e){toast('Veri parse hatası.');}}
+    else{initYear(currentView.y,false);migrateAlisveris();refresh();} // yeni döküman: hemen kaydetme
+  },err=>{
+    setSyncStatus(false);toast('Offline çalışılıyor — yerel veri yüklendi.');
     const local=localStorage.getItem('butce_offline');
-    if(local){try{const lp=JSON.parse(local);if(lp&&lp.years&&Object.keys(lp.years).length>0)db_data=lp;}catch(e){}}
-    if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
+    if(local){try{db_data=JSON.parse(local);}catch(e){}}
+    // Offline'da boş kalsa bile Firebase'e yazma — veri silme riski
+    if(!Object.keys(db_data.years).length){db_data={years:{}};}
     migrateAlisveris();refresh();
-    toast('⚠️ Buluta bağlanılamadı, offline moddasın.');
   });
 }
 function setSyncStatus(ok){
   ['sync-icon-d','sync-icon-m'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.color=ok?'#10b981':'#f87171';});
   const t=document.getElementById('mob-sync-txt');if(t)t.textContent=ok?'✓ Senkronize':'Offline — yerel veri';
-  if(ok)window._offlineMode=false;
 }
-
-/* ══ KAYIT: versiyon kontrolü + çakışma tespiti + otomatik geçmiş ══ */
 function save(){
-  if(!db_data.years||Object.keys(db_data.years).length===0){console.warn('save() engellendi: boş veri');return;}
-  const json=JSON.stringify(db_data);
-  try{localStorage.setItem('butce_offline',json);}catch(e){}
+  if(!db_data.years||Object.keys(db_data.years).length===0)return; // boş veri yazma
+  const json=JSON.stringify(db_data);localStorage.setItem('butce_offline',json);
   clearTimeout(saveTimer);
-  if(!db_cloud)return;
-  saveTimer=setTimeout(()=>{ doCloudSave(json); },600);
+  if(db_cloud)saveTimer=setTimeout(()=>{db_cloud.collection('budgets').doc(budgetId).set({data:json}).catch(()=>toast('Kayıt hatası.'));},600);
 }
-function doCloudSave(json){
-  if(!db_data.years||Object.keys(db_data.years).length===0)return;
-  const docRef=db_cloud.collection('budgets').doc(budgetId);
-  db_cloud.runTransaction(tx=>{
-    return tx.get(docRef).then(doc=>{
-      const remoteVersion=doc.exists?(doc.data().version||0):0;
-      // Çakışma kontrolü: bizim bildiğimizden daha yeni bir versiyon buluttaysa dur, kullanıcıyı uyar.
-      if(remoteVersion>lastKnownVersion){
-        pendingWriteJson=json;
-        throw {code:'CONFLICT'};
-      }
-      const newVersion=remoteVersion+1;
-      tx.set(docRef,{data:json,version:newVersion,updatedAt:Date.now(),updatedBy:deviceId});
-      // Otomatik geçmiş: her yazımda bir önceki hâli history koleksiyonuna at (son 20 ile sınırlı, best-effort)
-      if(doc.exists&&doc.data().data){
-        const histRef=db_cloud.collection('budgets').doc(budgetId).collection('history').doc('v'+remoteVersion);
-        tx.set(histRef,{data:doc.data().data,version:remoteVersion,savedAt:doc.data().updatedAt||Date.now()});
-      }
-      return newVersion;
-    });
-  }).then(newVersion=>{
-    lastKnownVersion=newVersion;
-    setSyncStatus(true);
-    pruneOldHistory();
-  }).catch(err=>{
-    if(err&&err.code==='CONFLICT'){
-      document.getElementById('conflict-modal').style.display='flex';
-    }else{
-      setSyncStatus(false);
-      toast('Kayıt hatası, tekrar denenecek.');
-      // kısa süre sonra tekrar dene (geçici ağ sorunları için)
-      clearTimeout(saveTimer);
-      saveTimer=setTimeout(()=>doCloudSave(json),4000);
-    }
-  });
-}
-function forceOverwriteRemote(){
-  document.getElementById('conflict-modal').style.display='none';
-  if(!pendingWriteJson)return;
-  const docRef=db_cloud.collection('budgets').doc(budgetId);
-  docRef.get().then(doc=>{
-    const remoteVersion=doc.exists?(doc.data().version||0):0;
-    const newVersion=remoteVersion+1;
-    const batch=db_cloud.batch();
-    if(doc.exists&&doc.data().data){
-      const histRef=docRef.collection('history').doc('v'+remoteVersion);
-      batch.set(histRef,{data:doc.data().data,version:remoteVersion,savedAt:doc.data().updatedAt||Date.now()});
-    }
-    batch.set(docRef,{data:pendingWriteJson,version:newVersion,updatedAt:Date.now(),updatedBy:deviceId});
-    return batch.commit().then(()=>{lastKnownVersion=newVersion;pruneOldHistory();});
-  }).then(()=>{pendingWriteJson=null;toast('Kaydedildi (üzerine yazıldı).');}).catch(()=>{toast('Kayıt hatası.');});
-}
-function pruneOldHistory(){
-  if(!db_cloud)return;
-  db_cloud.collection('budgets').doc(budgetId).collection('history').orderBy('version','desc').get().then(snap=>{
-    const docs=snap.docs;
-    if(docs.length>20){
-      const batch=db_cloud.batch();
-      docs.slice(20).forEach(d=>batch.delete(d.ref));
-      batch.commit().catch(()=>{});
-    }
-  }).catch(()=>{});
-}
-function flushSave(){
-  // Sayfa kapanırken / arka plana giderken bekleyen kaydı zorla gönder.
-  if(saveTimer){clearTimeout(saveTimer);saveTimer=null;}
-  if(!db_data.years||Object.keys(db_data.years).length===0)return;
-  const json=JSON.stringify(db_data);
-  try{localStorage.setItem('butce_offline',json);}catch(e){}
-  if(db_cloud)doCloudSave(json);
-}
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushSave();});
-window.addEventListener('pagehide',flushSave);
-window.addEventListener('beforeunload',flushSave);
-
-function openHistoryModal(){
-  document.getElementById('history-modal').style.display='flex';
-  const listEl=document.getElementById('history-list');
-  listEl.innerHTML='Yükleniyor…';
-  if(!db_cloud){listEl.innerHTML='Bulut bağlantısı yok.';return;}
-  db_cloud.collection('budgets').doc(budgetId).collection('history').orderBy('version','desc').limit(20).get().then(snap=>{
-    if(snap.empty){listEl.innerHTML='Henüz geçmiş sürüm yok.';return;}
-    let html='';
-    snap.forEach(d=>{
-      const v=d.data();
-      const dt=new Date(v.savedAt||0);
-      html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
-        <div><div style="font-weight:700;font-size:12px">Versiyon ${v.version}</div><div style="font-size:11px;color:var(--muted)">${dt.toLocaleString('tr-TR')}</div></div>
-        <button class="modal-btn" onclick="restoreHistoryVersion('${d.id}')">Geri Yükle</button>
-      </div>`;
-    });
-    listEl.innerHTML=html;
-  }).catch(()=>{listEl.innerHTML='Geçmiş yüklenemedi.';});
-}
-function closeHistoryModal(){document.getElementById('history-modal').style.display='none';}
-function restoreHistoryVersion(docId){
-  if(!confirm('Bu sürüm geri yüklenecek ve mevcut ekran bu veriyle güncellenecek. Emin misin? (Geri yükledikten sonra kaydetmeyi unutma)'))return;
-  db_cloud.collection('budgets').doc(budgetId).collection('history').doc(docId).get().then(doc=>{
-    if(!doc.exists){toast('Sürüm bulunamadı.');return;}
-    try{
-      const parsed=JSON.parse(doc.data().data);
-      if(parsed&&parsed.years){
-        db_data=parsed;
-        closeHistoryModal();
-        refresh();
-        toast('Sürüm yüklendi. Değişiklik yapıp kaydedince buluta yazılacak.');
-      }
-    }catch(e){toast('Sürüm okunamadı.');}
-  });
-}
-
 function refresh(){if(currentView.screen==='month')showMonth(currentView.y,currentView.ay);else showDashboard(currentView.dashYear);}
 
 function getDevredenBakiye(stopY,stopAy){
@@ -796,7 +612,10 @@ function renderMonthDesktop(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKal
             onblur="var rv=db_data.years[${y}].months['${ay}'].bolumler['${b.id}'].rows[${i}];this.value=rv.tutar?fmt(rv.tutar):''"
             onchange="rUp('${b.id}',${i},'tutar',this.value)" onkeydown="if(event.key==='Enter')focusNextInput(this)"></div>
           <div style="text-align:center"><input type="checkbox" class="paid-check" ${r.isPaid?'checked':''} onchange="rUp('${b.id}',${i},'isPaid',this.checked)"></div>
-          <div class="del-btn" onclick="rDel('${b.id}',${i})">✕</div>
+          <div style="display:flex;gap:4px;align-items:center">
+            <div class="del-btn" style="font-size:13px;color:#15803d;opacity:.8" onclick="satYatirim('${b.id}',${i})" title="Sat">💰</div>
+            <div class="del-btn" onclick="rDel('${b.id}',${i})">✕</div>
+          </div>
         </div>`;
       }else{
         const ph=b.id==='KREDİ KARTI'?'Banka Adı':'Açıklama';
@@ -894,7 +713,10 @@ function renderMonthMobile(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKala
             <div class="m-edit-field"><label>Birim ₺</label><input type="number" inputmode="decimal" value="${r.birim||''}" placeholder="fiyat" onchange="rUp('${b.id}',${i},'birim',this.value)"></div>
             <div class="m-edit-field full"><label>Tutar</label><input type="number" inputmode="decimal" value="${r.tutar?fmt(r.tutar):''}" placeholder="0" onfocus="this.value=getRaw(${y},'${ay}','${b.id}',${i})" onblur="var rv=db_data.years[${y}].months['${ay}'].bolumler['${b.id}'].rows[${i}];this.value=rv.tutar?fmt(rv.tutar):''" onchange="rUp('${b.id}',${i},'tutar',this.value)"></div>
           </div>
-          <div class="m-edit-actions"><button class="m-edit-btn del" onclick="rDel('${b.id}',${i})">Sil</button></div>
+          <div class="m-edit-actions">
+            <button class="m-edit-btn" style="color:#15803d;border-color:#86efac;background:#f0fdf4" onclick="satYatirim('${b.id}',${i})">💰 Sat</button>
+            <button class="m-edit-btn del" onclick="rDel('${b.id}',${i})">Sil</button>
+          </div>
         </div>`;
       }else{
         html+=`<div class="m-edit ${editOpen?'open':''}" id="ep-${r.id}">
@@ -917,6 +739,34 @@ function renderMonthMobile(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKala
   return html;
 }
 
+function satYatirim(bId,i){
+  const row=db_data.years[currentView.y].months[currentView.ay].bolumler[bId].rows[i];
+  if(!row.ad){toast('Önce varlık adı girin.');return;}
+  const mevcutMiktar=evalSafe(row.miktar)||0;
+  if(mevcutMiktar<=0){toast('Envanterde bu varlık yok.');return;}
+  const satMiktarStr=prompt('Kaç adet '+row.ad+' satıyorsunuz?\n(Mevcut: '+mevcutMiktar+')', mevcutMiktar);
+  if(!satMiktarStr)return;
+  const satMiktar=evalSafe(satMiktarStr);
+  if(!satMiktar||satMiktar<=0)return;
+  if(satMiktar>mevcutMiktar){toast('Yeterli miktar yok!');return;}
+  const satFiyatStr=prompt(row.ad+' birim satış fiyatı? (₺)', row.birim||'');
+  if(!satFiyatStr)return;
+  const satFiyat=evalSafe(satFiyatStr);
+  if(!satFiyat||satFiyat<=0)return;
+  const satTutar=Math.round(satMiktar*satFiyat);
+  if(!confirm(satMiktar+' adet '+row.ad+' → '+satTutar.toLocaleString('tr-TR')+' ₺ gelir olarak eklensin mi?'))return;
+  const yeniMiktar=parseFloat((mevcutMiktar-satMiktar).toFixed(4));
+  row.miktar=yeniMiktar>0?String(yeniMiktar):'0';
+  if(yeniMiktar>0&&row.birim){row.tutar=Math.round(yeniMiktar*evalSafe(row.birim));row.tutar_raw=String(row.tutar);}
+  else{row.tutar=0;row.tutar_raw='0';}
+  const m=db_data.years[currentView.y].months[currentView.ay];
+  const eskiRaw=m.maas_raw||String(m.maas||0);
+  m.maas_raw=eskiRaw?eskiRaw+'+'+satTutar:String(satTutar);
+  m.maas=evalSafe(m.maas_raw);
+  save();
+  showMonth(currentView.y,currentView.ay);
+  toast('✓ '+satMiktar+' '+row.ad+' satıldı, ₺'+satTutar.toLocaleString('tr-TR')+' gelire eklendi.');
+}
 function toggleSection(hdr){const body=hdr.nextElementSibling;const chev=hdr.querySelector('.chev');body.classList.toggle('open');chev.classList.toggle('open');}
 function saveMaas(y,ay,raw){
   db_data.years[y].months[ay].maas_raw=raw;db_data.years[y].months[ay].maas=evalSafe(raw);
@@ -1057,6 +907,14 @@ try{
     if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
     refresh();
   }else{
+    setTimeout(function(){
+      const sub=document.getElementById('mob-subtitle');
+      if(sub&&sub.textContent==='Yükleniyor…'){
+        try{const local=localStorage.getItem('butce_offline');if(local)db_data=JSON.parse(local);}catch(e){}
+        if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
+        setSyncStatus(false);migrateAlisveris();refresh();
+      }
+    },4000);
     loadSync();
   }
 }catch(e){
