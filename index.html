@@ -397,29 +397,26 @@ function migrateAlisveris(){
 }
 
 function loadSync(){
-  if(!db_cloud){
-    setSyncStatus(false);
-    const local=localStorage.getItem('butce_offline');
-    if(local){try{db_data=JSON.parse(local);}catch(e){}}
-    if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
-    migrateAlisveris();refresh();return;
-  }
-  db_cloud.collection('budgets').doc(budgetId).onSnapshot(doc=>{
+  // Önce localStorage'dan yükle, hemen göster
+  const local=localStorage.getItem('butce_offline');
+  if(local){try{const lp=JSON.parse(local);if(lp&&lp.years&&Object.keys(lp.years).length>0){db_data=lp;migrateAlisveris();refresh();}}catch(e){}}
+  if(!db_cloud){setSyncStatus(false);if(!Object.keys(db_data.years).length){initYear(currentView.y,false);migrateAlisveris();refresh();}return;}
+  // Firebase'den tek seferlik oku
+  db_cloud.collection('budgets').doc(budgetId).get().then(doc=>{
     if(doc.exists){
       try{
-        if(_satisKilidi){setSyncStatus(true);return;}
-        db_data=JSON.parse(doc.data().data);setSyncStatus(true);migrateAlisveris();refresh();
-      }catch(e){toast('Veri parse hatası.');}
+        const parsed=JSON.parse(doc.data().data);
+        if(parsed&&parsed.years&&Object.keys(parsed.years).length>0){
+          db_data=parsed;setSyncStatus(true);
+          localStorage.setItem('butce_offline',JSON.stringify(db_data));
+          migrateAlisveris();refresh();
+        }else{setSyncStatus(true);}
+      }catch(e){setSyncStatus(false);}
+    }else{
+      setSyncStatus(false);
+      if(!Object.keys(db_data.years).length)initYear(currentView.y,false);
     }
-    else{initYear(currentView.y,false);migrateAlisveris();refresh();} // yeni döküman: hemen kaydetme
-  },err=>{
-    setSyncStatus(false);toast('Offline çalışılıyor — yerel veri yüklendi.');
-    const local=localStorage.getItem('butce_offline');
-    if(local){try{db_data=JSON.parse(local);}catch(e){}}
-    // Offline'da boş kalsa bile Firebase'e yazma — veri silme riski
-    if(!Object.keys(db_data.years).length){db_data={years:{}};}
-    migrateAlisveris();refresh();
-  });
+  }).catch(()=>{setSyncStatus(false);});
 }
 function setSyncStatus(ok){
   ['sync-icon-d','sync-icon-m'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.color=ok?'#10b981':'#f87171';});
@@ -752,9 +749,7 @@ function satYatirim(bId,i){
   Object.values(db_data.years).forEach(yr=>{
     Object.values(yr.months||{}).forEach(mn=>{
       (mn.bolumler?.[bId]?.rows||[]).forEach(r=>{
-        if(r.isPaid&&r.ad&&r.ad.toUpperCase().trim()===adKey){
-          toplamMiktar+=evalSafe(r.miktar)||0;
-        }
+        if(r.isPaid&&r.ad&&r.ad.toUpperCase().trim()===adKey)toplamMiktar+=evalSafe(r.miktar)||0;
       });
     });
   });
@@ -772,7 +767,7 @@ function satYatirim(bId,i){
   const satTutar=Math.round(satMiktar*satFiyat);
   if(!confirm(satMiktar+' '+adKey+' → '+satTutar.toLocaleString('tr-TR')+' ₺ gelir eklensin, envanterden düşülsün?'))return;
   let kalanDusulecek=satMiktar;
-  // Önce tıklanan satırdan düş
+  // Tıklanan satırdan düş
   const mevcutMiktar=evalSafe(row.miktar)||0;
   if(mevcutMiktar>0){
     const bu=Math.min(mevcutMiktar,kalanDusulecek);
@@ -787,8 +782,7 @@ function satYatirim(bId,i){
     Object.values(db_data.years).forEach(yr=>{
       Object.values(yr.months||{}).forEach(mn=>{
         (mn.bolumler?.[bId]?.rows||[]).forEach(r=>{
-          if(kalanDusulecek<=0.0001)return;
-          if(!r.isPaid||!r.ad||r.ad.toUpperCase().trim()!==adKey||r===row)return;
+          if(kalanDusulecek<=0.0001||!r.isPaid||!r.ad||r.ad.toUpperCase().trim()!==adKey||r===row)return;
           const m2=evalSafe(r.miktar)||0;if(m2<=0)return;
           const bu=Math.min(m2,kalanDusulecek);
           const yeni=parseFloat((m2-bu).toFixed(4));
@@ -805,8 +799,6 @@ function satYatirim(bId,i){
   const eskiRaw=m.maas_raw||String(m.maas||0);
   m.maas_raw=(eskiRaw&&eskiRaw!=='0')?eskiRaw+'+'+satTutar:String(satTutar);
   m.maas=evalSafe(m.maas_raw);
-  _satisKilidi=true;
-  setTimeout(()=>{_satisKilidi=false;},3000);
   save();
   showMonth(currentView.y,currentView.ay);
   toast('✓ '+satMiktar+' '+adKey+' satıldı, ₺'+satTutar.toLocaleString('tr-TR')+' gelire eklendi.');
