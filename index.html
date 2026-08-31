@@ -326,7 +326,7 @@ const TATILLER=["01.01","20.03","21.03","22.03","23.04","01.05","19.05","27.05",
 
 let db_data={years:{}};
 let currentView={screen:'month',dashYear:'ALL',y:new Date().getFullYear(),ay:AY_ADLARI[new Date().getMonth()]};
-let saveTimer=null,openEditId=null;
+let saveTimer=null,openEditId=null,_satisKilidi=false;
 
 function isHoliday(d){const dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0');return TATILLER.includes(`${dd}.${mm}`);}
 function adjNext(dO){let d=new Date(dO);while(d.getDay()===0||d.getDay()===6||isHoliday(d))d.setDate(d.getDate()+1);return d;}
@@ -405,7 +405,12 @@ function loadSync(){
     migrateAlisveris();refresh();return;
   }
   db_cloud.collection('budgets').doc(budgetId).onSnapshot(doc=>{
-    if(doc.exists){try{db_data=JSON.parse(doc.data().data);setSyncStatus(true);migrateAlisveris();refresh();}catch(e){toast('Veri parse hatası.');}}
+    if(doc.exists){
+      try{
+        if(_satisKilidi){setSyncStatus(true);return;}
+        db_data=JSON.parse(doc.data().data);setSyncStatus(true);migrateAlisveris();refresh();
+      }catch(e){toast('Veri parse hatası.');}
+    }
     else{initYear(currentView.y,false);migrateAlisveris();refresh();} // yeni döküman: hemen kaydetme
   },err=>{
     setSyncStatus(false);toast('Offline çalışılıyor — yerel veri yüklendi.');
@@ -742,7 +747,6 @@ function renderMonthMobile(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKala
 function satYatirim(bId,i){
   const row=db_data.years[currentView.y].months[currentView.ay].bolumler[bId].rows[i];
   if(!row.ad){toast('Önce varlık adı girin.');return;}
-  // Tüm aylardaki toplam envanteri hesapla
   const adKey=row.ad.toUpperCase().trim();
   let toplamMiktar=0;
   Object.values(db_data.years).forEach(yr=>{
@@ -756,49 +760,43 @@ function satYatirim(bId,i){
   });
   toplamMiktar=parseFloat(toplamMiktar.toFixed(4));
   if(toplamMiktar<=0){toast('Envanterde bu varlık yok.');return;}
-  const satMiktarStr=prompt(adKey+' satış miktarı? (Toplam envanter: '+toplamMiktar+')', '');
+  const satMiktarStr=prompt(adKey+' satış miktarı? (Toplam: '+toplamMiktar+')','');
   if(!satMiktarStr||satMiktarStr.trim()==='')return;
   const satMiktar=evalSafe(satMiktarStr);
   if(!satMiktar||satMiktar<=0){toast('Geçersiz miktar.');return;}
-  if(satMiktar>toplamMiktar){toast('Yeterli miktar yok! Toplam: '+toplamMiktar);return;}
-  const satFiyatStr=prompt(adKey+' birim satış fiyatı? (₺)', row.birim||'');
+  if(satMiktar>toplamMiktar+0.0001){toast('Yeterli miktar yok! Toplam: '+toplamMiktar);return;}
+  const satFiyatStr=prompt(adKey+' birim satış fiyatı? (₺)',row.birim||'');
   if(!satFiyatStr||satFiyatStr.trim()==='')return;
   const satFiyat=evalSafe(satFiyatStr);
   if(!satFiyat||satFiyat<=0){toast('Geçersiz fiyat.');return;}
   const satTutar=Math.round(satMiktar*satFiyat);
   if(!confirm(satMiktar+' '+adKey+' → '+satTutar.toLocaleString('tr-TR')+' ₺ gelir eklensin, envanterden düşülsün?'))return;
-  // Envanterden düş — bu satırdan başla, yetmezse diğer satırlardan da düş
   let kalanDusulecek=satMiktar;
-  const aylar=[];
-  Object.keys(db_data.years).forEach(yStr=>{
-    Object.keys(db_data.years[yStr].months).forEach(ay=>{
-      aylar.push({y:yStr,ay,rows:db_data.years[yStr].months[ay].bolumler?.[bId]?.rows||[]});
-    });
-  });
-  // Önce mevcut satırdan düş
+  // Önce tıklanan satırdan düş
   const mevcutMiktar=evalSafe(row.miktar)||0;
   if(mevcutMiktar>0){
     const bu=Math.min(mevcutMiktar,kalanDusulecek);
     const yeni=parseFloat((mevcutMiktar-bu).toFixed(4));
     row.miktar=String(yeni);
-    if(row.birim&&yeni>0){row.tutar=Math.round(yeni*evalSafe(row.birim));row.tutar_raw=String(row.tutar);}
+    if(yeni>0&&row.birim){const t=Math.round(yeni*evalSafe(row.birim));row.tutar=-Math.abs(t);row.tutar_raw=String(t);}
     else{row.tutar=0;row.tutar_raw='0';}
     kalanDusulecek=parseFloat((kalanDusulecek-bu).toFixed(4));
   }
-  // Eğer hâlâ düşülecek varsa diğer satırlara bak
-  if(kalanDusulecek>0){
-    aylar.forEach(({rows})=>{
-      rows.forEach(r=>{
-        if(kalanDusulecek<=0)return;
-        if(!r.isPaid||!r.ad||r.ad.toUpperCase().trim()!==adKey||r===row)return;
-        const m2=evalSafe(r.miktar)||0;
-        if(m2<=0)return;
-        const bu=Math.min(m2,kalanDusulecek);
-        const yeni=parseFloat((m2-bu).toFixed(4));
-        r.miktar=String(yeni);
-        if(r.birim&&yeni>0){r.tutar=Math.round(yeni*evalSafe(r.birim));r.tutar_raw=String(r.tutar);}
-        else{r.tutar=0;r.tutar_raw='0';}
-        kalanDusulecek=parseFloat((kalanDusulecek-bu).toFixed(4));
+  // Kalan varsa diğer satırlardan düş
+  if(kalanDusulecek>0.0001){
+    Object.values(db_data.years).forEach(yr=>{
+      Object.values(yr.months||{}).forEach(mn=>{
+        (mn.bolumler?.[bId]?.rows||[]).forEach(r=>{
+          if(kalanDusulecek<=0.0001)return;
+          if(!r.isPaid||!r.ad||r.ad.toUpperCase().trim()!==adKey||r===row)return;
+          const m2=evalSafe(r.miktar)||0;if(m2<=0)return;
+          const bu=Math.min(m2,kalanDusulecek);
+          const yeni=parseFloat((m2-bu).toFixed(4));
+          r.miktar=String(yeni);
+          if(yeni>0&&r.birim){const t=Math.round(yeni*evalSafe(r.birim));r.tutar=-Math.abs(t);r.tutar_raw=String(t);}
+          else{r.tutar=0;r.tutar_raw='0';}
+          kalanDusulecek=parseFloat((kalanDusulecek-bu).toFixed(4));
+        });
       });
     });
   }
@@ -807,6 +805,8 @@ function satYatirim(bId,i){
   const eskiRaw=m.maas_raw||String(m.maas||0);
   m.maas_raw=(eskiRaw&&eskiRaw!=='0')?eskiRaw+'+'+satTutar:String(satTutar);
   m.maas=evalSafe(m.maas_raw);
+  _satisKilidi=true;
+  setTimeout(()=>{_satisKilidi=false;},3000);
   save();
   showMonth(currentView.y,currentView.ay);
   toast('✓ '+satMiktar+' '+adKey+' satıldı, ₺'+satTutar.toLocaleString('tr-TR')+' gelire eklendi.');
