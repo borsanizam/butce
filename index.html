@@ -477,7 +477,7 @@ function getChartData(targetYear){
 }
 function getAssetInventory(targetYear){
   const inv={};const years=(targetYear==='ALL')?Object.keys(db_data.years):[String(targetYear)];
-  years.forEach(yStr=>{Object.values(db_data.years[yStr]?.months||{}).forEach(m=>{m.bolumler?.['YATIRIM']?.rows.forEach(r=>{if(r.isPaid&&r.ad&&r.miktar){const k=r.ad.toUpperCase().trim();inv[k]=(inv[k]||0)+Number(r.miktar||0);}});});});
+  years.forEach(yStr=>{Object.values(db_data.years[yStr]?.months||{}).forEach(m=>{m.bolumler?.['YATIRIM']?.rows.forEach(r=>{if(r.ad&&r.miktar){const k=r.ad.toUpperCase().trim();inv[k]=(inv[k]||0)+Number(r.miktar||0);}});});});
   return Object.entries(inv).filter(([,q])=>q>0).map(([n,q])=>`${q} ${n}`).join(' · ')||'Henüz varlık yok';
 }
 
