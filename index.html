@@ -477,7 +477,7 @@ function getChartData(targetYear){
 }
 function getAssetInventory(targetYear){
   const inv={};const years=(targetYear==='ALL')?Object.keys(db_data.years):[String(targetYear)];
-  years.forEach(yStr=>{Object.values(db_data.years[yStr]?.months||{}).forEach(m=>{m.bolumler?.['YATIRIM']?.rows.forEach(r=>{if(r.ad&&r.miktar){const k=r.ad.toUpperCase().trim();inv[k]=(inv[k]||0)+Number(r.miktar||0);}});});});
+  years.forEach(yStr=>{Object.values(db_data.years[yStr]?.months||{}).forEach(m=>{m.bolumler?.['YATIRIM']?.rows.forEach(r=>{if(r.isPaid&&r.ad&&r.miktar){const k=r.ad.toUpperCase().trim();inv[k]=(inv[k]||0)+Number(r.miktar||0);}});});});
   return Object.entries(inv).filter(([,q])=>q>0).map(([n,q])=>`${q} ${n}`).join(' · ')||'Henüz varlık yok';
 }
 
@@ -749,7 +749,7 @@ function satYatirim(bId,i){
   Object.values(db_data.years).forEach(yr=>{
     Object.values(yr.months||{}).forEach(mn=>{
       (mn.bolumler?.[bId]?.rows||[]).forEach(r=>{
-        if(r.ad&&r.ad.toUpperCase().trim()===adKey)toplamMiktar+=evalSafe(r.miktar)||0;
+        if(r.isPaid&&r.ad&&r.ad.toUpperCase().trim()===adKey)toplamMiktar+=evalSafe(r.miktar)||0;
       });
     });
   });
@@ -782,7 +782,7 @@ function satYatirim(bId,i){
     Object.values(db_data.years).forEach(yr=>{
       Object.values(yr.months||{}).forEach(mn=>{
         (mn.bolumler?.[bId]?.rows||[]).forEach(r=>{
-          if(kalanDusulecek<=0.0001||!r.ad||r.ad.toUpperCase().trim()!==adKey||r===row)return;
+          if(kalanDusulecek<=0.0001||!r.isPaid||!r.ad||r.ad.toUpperCase().trim()!==adKey||r===row)return;
           const m2=evalSafe(r.miktar)||0;if(m2<=0)return;
           const bu=Math.min(m2,kalanDusulecek);
           const yeni=parseFloat((m2-bu).toFixed(4));
