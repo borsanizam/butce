@@ -559,8 +559,8 @@ function getChartData(targetYear){
 }
 function getAssetInventory(targetYear){
   const inv={};const years=(targetYear==='ALL')?Object.keys(db_data.years):[String(targetYear)];
-  years.forEach(yStr=>{Object.values(db_data.years[yStr]?.months||{}).forEach(m=>{m.bolumler?.['YATIRIM']?.rows.forEach(r=>{if(r.isPaid&&r.ad&&r.miktar){const k=r.ad.toUpperCase().trim();inv[k]=(inv[k]||0)+Number(r.miktar||0);}});});});
-  return Object.entries(inv).filter(([,q])=>q>0).map(([n,q])=>`${q} ${n}`).join(' · ')||'Henüz varlık yok';
+  years.forEach(yStr=>{Object.values(db_data.years[yStr]?.months||{}).forEach(m=>{m.bolumler?.['YATIRIM']?.rows.forEach(r=>{if(r.isPaid&&r.ad&&r.miktar){const k=r.ad.toUpperCase().trim();inv[k]=(inv[k]||0)+(evalSafe(r.miktar)||0);}});});});
+  return Object.entries(inv).map(([n,q])=>[n,parseFloat(q.toFixed(4))]).filter(([,q])=>q>0).map(([n,q])=>`${q} ${n}`).join(' · ')||'Henüz varlık yok';
 }
 
 let dashChart=null;
@@ -903,10 +903,11 @@ function rUp(bId,i,k,v){
     row.tutar_raw=v;const n=evalSafe(v);
     row.tutar=(bId==='YATIRIM')?Math.abs(n):-Math.abs(n);
     if(bId==='YATIRIM'&&row.miktar&&row.birim){row.tutar=evalSafe(row.miktar)*evalSafe(row.birim);row.tutar_raw=String(row.tutar);}
+    if(bId==='YATIRIM'&&n&&n!==0)row.isPaid=true;
     if(bId==='ALIŞVERİŞ'&&n&&n!==0)row.isPaid=true;
   }else if(k==='miktar'||k==='birim'){
     row[k]=v;
-    if(row.miktar&&row.birim){const calc=evalSafe(row.miktar)*evalSafe(row.birim);row.tutar=calc;row.tutar_raw=String(calc);}
+    if(row.miktar&&row.birim){const calc=evalSafe(row.miktar)*evalSafe(row.birim);row.tutar=calc;row.tutar_raw=String(calc);if(bId==='YATIRIM'&&calc)row.isPaid=true;}
   }else if(k==='taksit'){
     row.taksit=parseInt(v)||0;
     if(!row.startAbs)row.startAbs=currentView.y*12+AY_ADLARI.indexOf(currentView.ay);
