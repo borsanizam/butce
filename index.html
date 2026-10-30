@@ -386,6 +386,11 @@ function getDateStyles(v,isPaid){
   const today=new Date();today.setHours(0,0,0,0);
   return(t<=today)?{bg:'#fee2e2',text:'#b91c1c'}:{bg:'#f0fdf4',text:'#15803d'};
 }
+function yatirimEtki(r){
+  // Yatırım satırının nakit etkisi: alım (miktar>0) = gider (-), satış (miktar<0) = para girişi (+)
+  const t=Math.abs(r.tutar||0);
+  return (evalSafe(r.miktar)<0)?t:-t;
+}
 function ensureId(row){if(!row.id)row.id='r_'+Date.now()+'_'+Math.random().toString(36).slice(2);return row;}
 
 function defaultMonth(){
@@ -520,7 +525,7 @@ function getDevredenBakiye(stopY,stopAy){
       if(yN===stopYN&&mIdx>=stopMIdx)return;
       const m=db_data.years[yStr]?.months[ay];if(!m)return;
       let net=m.maas||0;
-      Object.entries(m.bolumler).forEach(([bId,b])=>{b.rows.forEach(r=>{if(r.isPaid)net+=(bId==='YATIRIM')?-Math.abs(r.tutar||0):(r.tutar||0);});});
+      Object.entries(m.bolumler).forEach(([bId,b])=>{b.rows.forEach(r=>{if(r.isPaid)net+=(bId==='YATIRIM')?yatirimEtki(r):(r.tutar||0);});});
       total+=net;
     });
   });
@@ -534,7 +539,7 @@ function buildDesktopNav(){
     html+=`<div class="nav-section"><div class="nav-header"><span class="nav-label">📅 ${y}</span><div class="year-del-btn" onclick="deleteYear(${y})">SİL</div></div>`;
     AY_ADLARI.forEach(ay=>{
       const m=db_data.years[yStr]?.months[ay];let badge='';
-      if(m){let maas=m.maas||0;let g=0;Object.entries(m.bolumler).forEach(([bId,b])=>b.rows.forEach(r=>{if(r.isPaid)g+=(bId==='YATIRIM')?-Math.abs(r.tutar||0):r.tutar;}));const net=maas+g;if(net!==0)badge=`<span class="nav-badge ${net>0?'pos':'neg'}">${net>0?'+':''}${Math.round(net/1000)}K</span>`;}
+      if(m){let maas=m.maas||0;let g=0;Object.entries(m.bolumler).forEach(([bId,b])=>b.rows.forEach(r=>{if(r.isPaid)g+=(bId==='YATIRIM')?yatirimEtki(r):r.tutar;}));const net=maas+g;if(net!==0)badge=`<span class="nav-badge ${net>0?'pos':'neg'}">${net>0?'+':''}${Math.round(net/1000)}K</span>`;}
       const isAct=currentView.screen==='month'&&currentView.y===y&&currentView.ay===ay;
       html+=`<div class="nav-link ${isAct?'active':''}" onclick="showMonth(${y},'${ay}')">${ay} ${badge}</div>`;
     });
@@ -551,7 +556,7 @@ function getChartData(targetYear){
     years.forEach(yStr=>{
       const m=db_data.years[yStr]?.months[ay];if(!m?.bolumler)return;
       ayGel+=(m.maas||0);
-      Object.entries(m.bolumler).forEach(([bId,b])=>{b.rows.forEach(r=>{if(!r.isPaid)return;if(bId==='YATIRIM'){ayYat+=Math.abs(r.tutar||0);ayGid-=Math.abs(r.tutar||0);}else ayGid+=(r.tutar||0);});});
+      Object.entries(m.bolumler).forEach(([bId,b])=>{b.rows.forEach(r=>{if(!r.isPaid)return;if(bId==='YATIRIM'){const e=yatirimEtki(r);ayYat-=e;ayGid+=e;}else ayGid+=(r.tutar||0);});});
     });
     gel.push(ayGel);gid.push(ayGid);cumYat+=ayYat;yat.push(cumYat);
   });
@@ -628,7 +633,7 @@ function showMonth(y,ay){
   const m=db_data.years[y].months[ay];const maas=m.maas||0;
   const devreden=getDevredenBakiye(y,ay);
   let giderOdenen=0;
-  BOLUMLER.forEach(b=>{m.bolumler[b.id]?.rows.forEach(r=>{let c=r.tutar||0;if(b.id==='YATIRIM')c=-Math.abs(c);if(r.isPaid)giderOdenen+=c;});});
+  BOLUMLER.forEach(b=>{m.bolumler[b.id]?.rows.forEach(r=>{let c=r.tutar||0;if(b.id==='YATIRIM')c=yatirimEtki(r);if(r.isPaid)giderOdenen+=c;});});
   const perc=maas>0?Math.min((Math.abs(giderOdenen)/maas)*100,100):0;
   const barColor=perc>90?'#dc2626':perc>65?'#f59e0b':'#10b981';
   const hasNote=m.notes?.kiraci||m.notes?.genel;
@@ -667,8 +672,8 @@ function renderMonthDesktop(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKal
     </div>`;
   BOLUMLER.forEach(b=>{
     const isY=b.id==='YATIRIM';const rows=m.bolumler[b.id]?.rows||[];
-    const bTotal=rows.reduce((s,r)=>s+(isY?-Math.abs(r.tutar||0):(r.tutar||0)),0);
-    const bOdenen=rows.filter(r=>r.isPaid).reduce((s,r)=>s+(isY?-Math.abs(r.tutar||0):(r.tutar||0)),0);
+    const bTotal=rows.reduce((s,r)=>s+(isY?yatirimEtki(r):(r.tutar||0)),0);
+    const bOdenen=rows.filter(r=>r.isPaid).reduce((s,r)=>s+(isY?yatirimEtki(r):(r.tutar||0)),0);
     html+=`<div class="section-block"><div class="section-hdr ${b.cls}" onclick="toggleSection(this)">
       <span>${b.icon} ${b.id}</span>
       ${bTotal?`<span class="s-total">${fmtTL(bTotal)}</span>`:''}
@@ -756,7 +761,7 @@ function renderMonthMobile(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKala
     </div>`;
   BOLUMLER.forEach(b=>{
     const isY=b.id==='YATIRIM';const rows=m.bolumler[b.id]?.rows||[];
-    const bTotal=rows.reduce((s,r)=>s+(isY?-Math.abs(r.tutar||0):(r.tutar||0)),0);
+    const bTotal=rows.reduce((s,r)=>s+(isY?yatirimEtki(r):(r.tutar||0)),0);
     html+=`<div class="section-block"><div class="section-hdr ${b.cls}" onclick="toggleSection(this)">
       <span>${b.icon} ${b.id}</span>
       ${bTotal?`<span class="s-total">${fmtTL(bTotal)}</span>`:''}
@@ -895,7 +900,7 @@ function saveMaas(y,ay,raw){
   db_data.years[y].months[ay].maas_raw=raw;db_data.years[y].months[ay].maas=evalSafe(raw);
   save();if(!isMobile())buildDesktopNav();
   const m=db_data.years[y].months[ay];const maas=m.maas||0;let g=0;
-  BOLUMLER.forEach(b=>{m.bolumler[b.id]?.rows.forEach(r=>{let c=r.tutar||0;if(b.id==='YATIRIM')c=-Math.abs(c);if(r.isPaid)g+=c;});});
+  BOLUMLER.forEach(b=>{m.bolumler[b.id]?.rows.forEach(r=>{let c=r.tutar||0;if(b.id==='YATIRIM')c=yatirimEtki(r);if(r.isPaid)g+=c;});});
   const perc=maas>0?Math.min((Math.abs(g)/maas)*100,100):0;const bc=perc>90?'#dc2626':perc>65?'#f59e0b':'#10b981';
   const pb=document.getElementById('prog-bar');if(pb){pb.style.width=perc+'%';pb.style.background=bc;}
 }
@@ -1008,7 +1013,7 @@ function buildMonthDrawer(){
     const y=Number(yStr);html+=`<div class="year-section-mob"><div class="year-lbl-mob">${y} <span class="year-del-mob" onclick="deleteYear(${y})">Sil</span></div><div class="month-grid-mob">`;
     AY_ADLARI.forEach(ay=>{
       const m=db_data.years[yStr]?.months[ay];let badge='';let cls='';
-      if(m){let maas=m.maas||0;let g=0;Object.entries(m.bolumler).forEach(([bId,b])=>b.rows.forEach(r=>{if(r.isPaid)g+=(bId==='YATIRIM')?-Math.abs(r.tutar||0):r.tutar;}));const net=maas+g;if(net!==0){badge=`<span class="mb-b">${net>0?'+':''}${Math.round(net/1000)}K</span>`;cls=net>0?'pos':'neg';}}
+      if(m){let maas=m.maas||0;let g=0;Object.entries(m.bolumler).forEach(([bId,b])=>b.rows.forEach(r=>{if(r.isPaid)g+=(bId==='YATIRIM')?yatirimEtki(r):r.tutar;}));const net=maas+g;if(net!==0){badge=`<span class="mb-b">${net>0?'+':''}${Math.round(net/1000)}K</span>`;cls=net>0?'pos':'neg';}}
       const isAct=currentView.screen==='month'&&currentView.y===y&&currentView.ay===ay;
       html+=`<div class="month-btn-mob ${isAct?'active':''} ${cls}" onclick="closeMonthDrawer();showMonth(${y},'${ay}')">${ay.slice(0,3)}${badge}</div>`;
     });
