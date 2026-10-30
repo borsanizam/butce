@@ -879,11 +879,16 @@ function satYatirim(bId,i){
   // Gelire ekle
   const m=db_data.years[currentView.y].months[currentView.ay];
   const eskiRaw=m.maas_raw||String(m.maas||0);
-  m.maas_raw=(eskiRaw&&eskiRaw!=='0')?eskiRaw+'+'+satTutar:String(satTutar);
-  m.maas=evalSafe(m.maas_raw);
+  const oncekiMaas=(m.maas!=null&&m.maas!==0)?Number(m.maas):evalSafe(eskiRaw);
+  const hedefMaas=oncekiMaas+satTutar;
+  let yeniRaw=(eskiRaw&&eskiRaw!=='0')?eskiRaw+'+'+satTutar:String(satTutar);
+  // Metin formülü yanlış/bozuk hesaplanırsa düz sayıya dön, ekleme kesin görünsün
+  if(Math.abs(evalSafe(yeniRaw)-hedefMaas)>0.5)yeniRaw=String(hedefMaas);
+  m.maas_raw=yeniRaw;
+  m.maas=hedefMaas;
   save();
   showMonth(currentView.y,currentView.ay);
-  toast('✓ '+satMiktar+' '+adKey+' satıldı, ₺'+satTutar.toLocaleString('tr-TR')+' gelire eklendi.');
+  toast('✓ '+satMiktar+' '+adKey+' satıldı, ₺'+satTutar.toLocaleString('tr-TR')+' '+currentView.ay+' '+currentView.y+' gelirine eklendi.');
 }
 function toggleSection(hdr){const body=hdr.nextElementSibling;const chev=hdr.querySelector('.chev');body.classList.toggle('open');chev.classList.toggle('open');}
 function saveMaas(y,ay,raw){
