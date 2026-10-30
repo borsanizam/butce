@@ -357,12 +357,18 @@ function normalizeTarih(v,y,bId){
   if(c.length===4){const dO=new Date(y,parseInt(c.substring(2,4))-1,parseInt(c.substring(0,2)));if(!isNaN(dO.getTime()))return fmtDate(bId==='KREDİ KARTI'?adjNext(dO):adjPrev(dO));}
   return v;
 }
+function sayiTok(p){
+  // Virgul varsa ondalik ayrac (noktalar binlik). Virgul yoksa: 1.250 / 45.000 gibi bicimler binlik, 25.76 / 274.24 gibi bicimler ondalik.
+  if(p.indexOf(',')>-1)return p.replace(/\./g,'').replace(',','.');
+  if(/^[1-9]\d{0,2}(\.\d{3})+$/.test(p))return p.replace(/\./g,'');
+  return p;
+}
 function evalSafe(v){
   if(!v&&v!==0)return 0;
   try{
     let s=v.toString().trim().replace(/\s/g,'');
     const parts=s.split(/([+\-*\/])/);
-    const conv=parts.map(p=>{if(/^[+\-*\/]$/.test(p))return p;return p.replace(/\./g,'').replace(',','.');});
+    const conv=parts.map(p=>{if(/^[+\-*\/]$/.test(p))return p;return sayiTok(p);});
     let c=conv.join('').replace(/[^0-9+\-*\/().]/g,'');
     if(!c)return 0;
     const r=Function('"use strict";return ('+c+')')()||0;
@@ -391,6 +397,8 @@ function yatirimEtki(r){
   const t=Math.abs(r.tutar||0);
   return (evalSafe(r.miktar)<0)?t:-t;
 }
+function yatirimGelir(r){return (evalSafe(r.miktar)<0)?Math.abs(r.tutar||0):0;}
+function satisGeliri(m){let t=0;(m.bolumler&&m.bolumler['YATIRIM']?m.bolumler['YATIRIM'].rows:[]).forEach(r=>{if(r.isPaid)t+=yatirimGelir(r);});return t;}
 function ensureId(row){if(!row.id)row.id='r_'+Date.now()+'_'+Math.random().toString(36).slice(2);return row;}
 
 function defaultMonth(){
@@ -556,7 +564,7 @@ function getChartData(targetYear){
     years.forEach(yStr=>{
       const m=db_data.years[yStr]?.months[ay];if(!m?.bolumler)return;
       ayGel+=(m.maas||0);
-      Object.entries(m.bolumler).forEach(([bId,b])=>{b.rows.forEach(r=>{if(!r.isPaid)return;if(bId==='YATIRIM'){const e=yatirimEtki(r);ayYat-=e;ayGid+=e;}else ayGid+=(r.tutar||0);});});
+      Object.entries(m.bolumler).forEach(([bId,b])=>{b.rows.forEach(r=>{if(!r.isPaid)return;if(bId==='YATIRIM'){const e=yatirimEtki(r);ayYat-=e;if(e>0)ayGel+=e;else ayGid+=e;}else ayGid+=(r.tutar||0);});});
     });
     gel.push(ayGel);gid.push(ayGid);cumYat+=ayYat;yat.push(cumYat);
   });
@@ -630,29 +638,29 @@ function showDashboard(year='ALL'){
 function showMonth(y,ay){
   y=Number(y);currentView={screen:'month',dashYear:currentView.dashYear,y,ay};
   if(!db_data.years[y])initYear(y);openEditId=null;
-  const m=db_data.years[y].months[ay];const maas=m.maas||0;
+  const m=db_data.years[y].months[ay];const maas=m.maas||0;const satisG=satisGeliri(m);const gelirToplam=maas+satisG;
   const devreden=getDevredenBakiye(y,ay);
   let giderOdenen=0;
-  BOLUMLER.forEach(b=>{m.bolumler[b.id]?.rows.forEach(r=>{let c=r.tutar||0;if(b.id==='YATIRIM')c=yatirimEtki(r);if(r.isPaid)giderOdenen+=c;});});
-  const perc=maas>0?Math.min((Math.abs(giderOdenen)/maas)*100,100):0;
+  BOLUMLER.forEach(b=>{m.bolumler[b.id]?.rows.forEach(r=>{let c=r.tutar||0;if(b.id==='YATIRIM')c=Math.min(yatirimEtki(r),0);if(r.isPaid)giderOdenen+=c;});});
+  const perc=gelirToplam>0?Math.min((Math.abs(giderOdenen)/gelirToplam)*100,100):0;
   const barColor=perc>90?'#dc2626':perc>65?'#f59e0b':'#10b981';
   const hasNote=m.notes?.kiraci||m.notes?.genel;
-  const netKalan=devreden+maas+giderOdenen;
+  const netKalan=devreden+gelirToplam+giderOdenen;
   if(isMobile()){
     setMobNav('mni-ay');
     document.getElementById('mob-subtitle').textContent=`${ay} ${y}`;
-    document.getElementById('mob-scroll').innerHTML=renderMonthMobile(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKalan);
+    document.getElementById('mob-scroll').innerHTML=renderMonthMobile(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKalan,satisG);
   }else{
     buildDesktopNav();
-    document.getElementById('desktop-content').innerHTML=renderMonthDesktop(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKalan);
+    document.getElementById('desktop-content').innerHTML=renderMonthDesktop(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKalan,satisG);
   }
 }
 
-function renderMonthDesktop(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKalan){
+function renderMonthDesktop(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKalan,satisG){
   let html=`
     <div class="summary-grid">
       <div class="sum-card inv-card" style="border-color:#bbf7d0"><div class="lbl">💰 Varlık Envanteri (${y})</div><div class="val" style="color:#15803d;font-size:12px;margin-top:4px">${getAssetInventory(y)}</div></div>
-      <div class="sum-card"><div class="lbl">💵 ${ay} Maaşı</div><div class="val" style="color:#0369a1">${fmtTL(maas)}</div></div>
+      <div class="sum-card"><div class="lbl">💵 ${ay} ${satisG?'Geliri (maaş + satış)':'Maaşı'}</div><div class="val" style="color:#0369a1">${fmtTL(maas+satisG)}</div></div>
       <div class="sum-card"><div class="lbl">💸 Ödenen Gider</div><div class="val" style="color:#dc2626">${fmtTL(giderOdenen)}</div></div>
       <div class="sum-card"><div class="lbl">⚖️ Net Kalan</div><div class="val" style="color:${netKalan>=0?'#15803d':'#dc2626'};font-weight:800">${fmtTL(netKalan)}</div></div>
     </div>
@@ -731,10 +739,10 @@ function renderMonthDesktop(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKal
   return html;
 }
 
-function renderMonthMobile(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKalan){
+function renderMonthMobile(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKalan,satisG){
   let html=`
     <div class="m-sum-row">
-      <div class="m-sum-card"><div class="lbl">Maaş</div><div class="val" style="color:#0369a1">${fmtTL(maas)}</div></div>
+      <div class="m-sum-card"><div class="lbl">${satisG?'Gelir (maaş+satış)':'Maaş'}</div><div class="val" style="color:#0369a1">${fmtTL(maas+satisG)}</div></div>
       <div class="m-sum-card"><div class="lbl">Ödenen</div><div class="val" style="color:#dc2626">${fmtTL(giderOdenen)}</div></div>
     </div>
     <div class="m-sum-row">
@@ -798,9 +806,9 @@ function renderMonthMobile(y,ay,m,maas,giderOdenen,perc,barColor,hasNote,netKala
         html+=`<div class="m-edit ${editOpen?'open':''}" id="ep-${r.id}">
           <div class="m-edit-grid" style="grid-template-columns:1fr 1fr 1fr">
             <div class="m-edit-field"><label>Varlık</label><input value="${r.ad||''}" placeholder="ALTIN (Gr)" list="altin-tipleri" onchange="rUp('${b.id}',${i},'ad',this.value)"></div>
-            <div class="m-edit-field"><label>Miktar</label><input type="number" inputmode="decimal" value="${r.miktar||''}" placeholder="adet" onchange="rUp('${b.id}',${i},'miktar',this.value)"></div>
-            <div class="m-edit-field"><label>Birim ₺</label><input type="number" inputmode="decimal" value="${r.birim||''}" placeholder="fiyat" onchange="rUp('${b.id}',${i},'birim',this.value)"></div>
-            <div class="m-edit-field full"><label>Tutar</label><input type="number" inputmode="decimal" value="${r.tutar?fmt(r.tutar):''}" placeholder="0" onfocus="this.value=getRaw(${y},'${ay}','${b.id}',${i})" onblur="var rv=db_data.years[${y}].months['${ay}'].bolumler['${b.id}'].rows[${i}];this.value=rv.tutar?fmt(rv.tutar):''" onchange="rUp('${b.id}',${i},'tutar',this.value)"></div>
+            <div class="m-edit-field"><label>Miktar</label><input type="text" inputmode="decimal" value="${r.miktar||''}" placeholder="adet" onchange="rUp('${b.id}',${i},'miktar',this.value)"></div>
+            <div class="m-edit-field"><label>Birim ₺</label><input type="text" inputmode="decimal" value="${r.birim||''}" placeholder="fiyat" onchange="rUp('${b.id}',${i},'birim',this.value)"></div>
+            <div class="m-edit-field full"><label>Tutar</label><input type="text" inputmode="decimal" value="${r.tutar?fmt(r.tutar):''}" placeholder="0" onfocus="this.value=getRaw(${y},'${ay}','${b.id}',${i})" onblur="var rv=db_data.years[${y}].months['${ay}'].bolumler['${b.id}'].rows[${i}];this.value=rv.tutar?fmt(rv.tutar):''" onchange="rUp('${b.id}',${i},'tutar',this.value)"></div>
           </div>
           <div class="m-edit-actions">
             <button class="m-edit-btn" style="color:#15803d;border-color:#86efac;background:#f0fdf4" onclick="satYatirim('${b.id}',${i})">💰 Sat</button>
@@ -859,7 +867,7 @@ function satYatirim(bId,i){
   if(mevcutMiktar>0){
     const bu=Math.min(mevcutMiktar,kalanDusulecek);
     const yeni=parseFloat((mevcutMiktar-bu).toFixed(4));
-    row.miktar=String(yeni);
+    row.miktar=String(yeni).replace('.',',');
     if(yeni>0&&row.birim){const t=Math.round(yeni*evalSafe(row.birim));row.tutar=-Math.abs(t);row.tutar_raw=String(t);}
     else{row.tutar=0;row.tutar_raw='0';}
     kalanDusulecek=parseFloat((kalanDusulecek-bu).toFixed(4));
@@ -873,7 +881,7 @@ function satYatirim(bId,i){
           const m2=evalSafe(r.miktar)||0;if(m2<=0)return;
           const bu=Math.min(m2,kalanDusulecek);
           const yeni=parseFloat((m2-bu).toFixed(4));
-          r.miktar=String(yeni);
+          r.miktar=String(yeni).replace('.',',');
           if(yeni>0&&r.birim){const t=Math.round(yeni*evalSafe(r.birim));r.tutar=-Math.abs(t);r.tutar_raw=String(t);}
           else{r.tutar=0;r.tutar_raw='0';}
           kalanDusulecek=parseFloat((kalanDusulecek-bu).toFixed(4));
@@ -899,8 +907,8 @@ function toggleSection(hdr){const body=hdr.nextElementSibling;const chev=hdr.que
 function saveMaas(y,ay,raw){
   db_data.years[y].months[ay].maas_raw=raw;db_data.years[y].months[ay].maas=evalSafe(raw);
   save();if(!isMobile())buildDesktopNav();
-  const m=db_data.years[y].months[ay];const maas=m.maas||0;let g=0;
-  BOLUMLER.forEach(b=>{m.bolumler[b.id]?.rows.forEach(r=>{let c=r.tutar||0;if(b.id==='YATIRIM')c=yatirimEtki(r);if(r.isPaid)g+=c;});});
+  const m=db_data.years[y].months[ay];const maas=(m.maas||0)+satisGeliri(m);let g=0;
+  BOLUMLER.forEach(b=>{m.bolumler[b.id]?.rows.forEach(r=>{let c=r.tutar||0;if(b.id==='YATIRIM')c=Math.min(yatirimEtki(r),0);if(r.isPaid)g+=c;});});
   const perc=maas>0?Math.min((Math.abs(g)/maas)*100,100):0;const bc=perc>90?'#dc2626':perc>65?'#f59e0b':'#10b981';
   const pb=document.getElementById('prog-bar');if(pb){pb.style.width=perc+'%';pb.style.background=bc;}
 }
